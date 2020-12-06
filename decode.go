@@ -27,7 +27,8 @@ func unmarshalOPT(obj interface{}, args []string) error {
 		rt.Kind() != reflect.Ptr || // check for pointer first ...
 		rt.Elem().Kind() != reflect.Struct || // ... and after on the struct
 		!rv.Elem().IsValid() {
-		return errors.New("cannot unmarshal environment into not *struct type")
+		return errors.New("cannot unmarshal command-line arguments " +
+			"into not *struct type")
 	}
 
 	// Walk through all the fields of the structure and read all tags.
