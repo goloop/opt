@@ -1,11 +1,4 @@
-[//]: # (!!!Don't modify the README.md, use `make readme` to generate it!!!)
-
-
-[![Go Report Card](https://goreportcard.com/badge/github.com/goloop/opt)](https://goreportcard.com/report/github.com/goloop/opt) [![License](https://img.shields.io/badge/license-BSD-blue)](https://github.com/goloop/opt/blob/master/LICENSE) [![License](https://img.shields.io/badge/godoc-YES-green)](https://godoc.org/github.com/goloop/opt)
-
-
-*Version: 0.0.1*
-
+/*
 # opt
 
 The opt module implements methods for manage arguments of the command-line.
@@ -21,6 +14,7 @@ To install this package we can use `go get`:
 To use this package import it as:
 
     import "github.com/goloop/opt"
+
 
 ## Quick start
 
@@ -70,6 +64,7 @@ Use the Unmarshal method to parse os.Args and save it intp Go-struct, like:
         log.Fatal(err)
     }
 
+
 Now the application can be launched by any of the following methods (all call
 options are equivalent for `opt` parser):
 
@@ -98,8 +93,9 @@ For this example, after parsing, the data will be as follows:
     // args.B == 10
     // args.C == 15
 
-The opt package provides the ability to auto-generate help. In this example, the
-`Doc` field is a container for storing auto-generate help data:
+The opt package provides the ability to auto-generate help. In this example,
+the `Doc` field is a container for storing auto-generate help data:
+
 
     // Show help information.
     if args.Help {
@@ -107,8 +103,9 @@ The opt package provides the ability to auto-generate help. In this example, the
         return
     }
 
-After calling the application as `./main -h`, help information will be
-displayed:
+
+After calling the application as `./main -h`, help information
+will be displayed:
 
     Test application for testing opt package features.
 
@@ -127,8 +124,8 @@ arbitrary information to automatically generated help data.
 
 ### Named options
 
-The opt is flag identifier and the flag has a structure as
-`[short[,long[,value[,help]]]]` where is:
+The opt is flag identifier and the flag has a structure
+as `[short[,long[,value[,help]]]]` where is:
 
     short  short option name, like: `-p`, `-h`, `-d`, `-U`;
     long   long option name, like: `--port`, `--help`, `--debug`;
@@ -137,16 +134,17 @@ The opt is flag identifier and the flag has a structure as
 
 At least one option identifier must be specified, short or long or both at once.
 
-Arguments may be skipped or set to underscore as: `,port,8080` equal to
-`_,port,8080,_` or `p,,,port number` equal to `p,_,_,port number`.
+Arguments may be skipped or set to underscore as: `,port,8080` equal
+to `_,port,8080,_` or `p,,,port number` equal to `p,_,_,port number`.
 
-### Examples
+Examples
 
     type Args struct {
         Help bool   `opt:"h,help,,show help"` // default 'false' for bool type
         Host string `opt:"_,host,localhost,host addr"`
         Port int    `opt:"p,port,8080,port number"`
     }
+
 
 #### Short name
 
@@ -158,8 +156,9 @@ From two or more characters in a range `a-z`
 
 #### Value
 
-Literal of the appropriate type. To specify a complex default value like string
-with `,` symbol, or sequence of values - escape the expression accordingly:
+Literal of the appropriate type. To specify a complex default value like
+string with `,` symbol, or sequence of values - escape the expression
+accordingly:
 
     OpenPorts []int  `opt:",op,{80,8080,8383},list of open ports"`
     Greeting  string `opt:"g,,'Hello, world',greeting message"`
@@ -167,17 +166,17 @@ with `,` symbol, or sequence of values - escape the expression accordingly:
 
 #### Help
 
-Help line for argument. The string length is not limited. If the length of the
-help line and the left part (option name) are longer than 79 characters, the
-help will be cut into small pieces and formatted correctly.
+Help line for argument. The string length is not limited. If the length of
+the help line and the left part (option name) are longer than 79 characters,
+the help will be cut into small pieces and formatted correctly.
 
 // Args structure for parsing os.Args using opt package.
-
     type Args struct {
         // ...
         Verbose  bool `opt:"v,verbose,true,verbose mode (default true) you can use --no-verbose or --verbose=false to deactivate it."`
         // ...
     }
+
 
 Format result
 
@@ -188,9 +187,9 @@ Format result
 
 ### Positional options and path to the executable
 
-To set the positional option needed to specify an order index of it as a short
-option name. The long option name is ignored. Zero index always indicates to the
-executable path.
+To set the positional option needed to specify an order index of it as
+a short option name. The long option name is ignored. Zero index always
+indicates  to the executable path.
 
     type Args struct {
         Help bool   `opt:"h,help,,show help"`
@@ -200,24 +199,24 @@ executable path.
     }
 
 It looks like: `./main localhost 8080` after `Host` contains `localhost` and
-`Port` - `8080`. Named positional arguments are not required, so `./main
-localhost` is correct construction (port is default value: 80).
+`Port` - `8080`. Named positional arguments are not required,
+so `./main localhost` is correct construction (port is default value: 80).
 
-An array or slice can be used to indicate a list of a specific/indefinite length
-of the same type of positional arguments. The list contains positional arguments
-from 1 index (i.e. ignoring executable path). As short option name the `[]`
-marker must be set.
+An array or slice can be used to indicate a list
+of a specific/indefinite length of the same type of positional arguments.
+The list contains positional arguments from 1 index (i.e. ignoring
+executable path). As short option name the `[]` marker must be set.
 
     type Args struct {
         Path   string  `opt:"0"` // executable path
         Values []int   `opt:"[]"`
     }
 
-It looks like: `./main 1 2 3 4 5 6 7` after `Values` contains
-`[]int{1,2,3,4,5,6,7}`. Positional arguments are optional.
+It looks like: `./main 1 2 3 4 5 6 7`  after `Values` contains
+`[]int{1,2,3,4,5,6,7}`.  Positional arguments are optional.
 
-When using an array as container for positional options, there may be an
-overflow error:
+When using an array as container for positional options, there
+may be an overflow error:
 
     type Args struct {
         Values [3]string `opt:"[]"`
@@ -228,9 +227,9 @@ And `./main one two three four` make an overflow error.
 ### Help container
 
 Documentation is automatically generated during unmarshalling. In order to
-designate the field for help data set `?` as the short name. The field must be
-of string type. The remaining positions (long, value, help) will be ignored by
-the parser:
+designate the field for help data set `?` as the short name. The field must
+be of string type. The remaining positions (long, value, help) will be
+ignored by the parser:
 
     type Args struct {
         HelpData string `opt:"?"`
@@ -240,29 +239,31 @@ the parser:
 
 ### Long option
 
-It self-documenting option like: `--host`, `--user-name`, `--debug`. There are
-two dashes in front of the name and the name can use one or more dashes to
-separate words. This option case not sensitive, so `--user-name`, `--User-Name`,
-`--USER-NAME` these are the same names.
+It self-documenting option like: `--host`, `--user-name`, `--debug`.
+There are two dashes in front of the name and the name can use one or more
+dashes to separate words. This option case not sensitive,
+so `--user-name`, `--User-Name`, `--USER-NAME` these are the same names.
 
-After prefix from two dashes there should be no spaces:
+After prefix from two dashes  there should be no spaces:
 
     `--debug`  correct;
     `-- debug` incorrect for long option, it's like positional argument.
 
-If option has value it must be written after the equal sign (`=`) or after the
-space, like: `--host=localhost` or `--host localhost`. Multi-word meaning must
-be enclosed in double quotes, like: `--user-name="John Smith"` or `--user-name
-"John Smith"`. The switcher can be specified without value: `--debug` or
-`--debug=true` or `--debug true` for args configurations:
+If option has value it must be written after the equal sign (`=`) or after
+the space, like: `--host=localhost` or  `--host localhost`.
+Multi-word meaning must be enclosed in double quotes,
+like: `--user-name="John Smith"` or `--user-name "John Smith"`.
+The switcher can be specified without value: `--debug` or `--debug=true`
+or `--debug true` for args configurations:
 
     type Args struct {
         Debug bool `opt:",debug"` // default false for bool type
     }
 
-For boolean values in a long option the prefix `no-` can be specified to
-indicate `false`: `--debug` equal to `--debug=true`, `--no-debug` equal to
-`--debug=false`. This is also valid for specifying the default value as:
+For boolean values in a long option the prefix `no-` can be specified
+to indicate `false`: `--debug` equal to `--debug=true`,
+`--no-debug` equal to `--debug=false`. This is also valid
+for specifying the default value as:
 
     type Args struct {
         Debug bool `opt:",debug,true"` // default value sets as true
@@ -270,25 +271,25 @@ indicate `false`: `--debug` equal to `--debug=true`, `--no-debug` equal to
 
 ### Short option
 
-The abbreviation for long option is indicated as one character having one dash
-character in front of the name, like: `-h`, `-U`, `-d`. This option case
-sensitive, so `-u` and `-U` it's different names. Latin characters only:
-`A-Za-z`.
+The abbreviation for long option is indicated as one character having
+one dash character in front of the name, like:  `-h`, `-U`, `-d`.
+This option case sensitive, so `-u` and `-U` it's different names.
+Latin characters only: `A-Za-z`.
 
 After prefix from one dashes there should be no spaces:
 
     `-d` - correct;
     `- d` - incorrect.
 
-If option has value it must be written after the space character, like: `-h
-localhost`. Multi-word meaning must be enclosed in double quotes, like: `-U
-"John Smith"`.
+If option has value it must be written after the space character,
+like: `-h localhost`. Multi-word meaning must be enclosed in double
+quotes, like: `-U "John Smith"`.
 
-The values as numbers can be written without a space, i.e `-p8080` equal to `-p
-8080`.
+The values as numbers can be written without a space,
+i.e `-p8080` equal to `-p 8080`.
 
-The string value can also be written without a space if the first character of
-the value not expected short option:
+The string value can also be written without a space if the first
+character of the value not expected short option:
 
     type Args struct {
         Host  string `opt:",host,0.0.0.0"`
@@ -296,10 +297,10 @@ the value not expected short option:
         Debug int    `opt:"d"`
     }
 
--- short options registered: `-p` and `-d`, but options like `-t` and`-f` isn't
-registered therefore an expression like: `-dtrue` equal to `-d true`, or
-`-dfalse` equal to `-d false`. But option like: `-dpass` will be parsed as `-d
--p ass` because there is a registered `-p` option.
+-- short options registered: `-p` and `-d`, but options like `-t` and`-f`
+isn't registered therefore an expression like: `-dtrue` equal to `-d true`,
+or `-dfalse` equal to `-d false`. But option like: `-dpass` will be parsed
+as `-d -p ass` because there is a registered `-p` option.
 
 Short options can be grouped: `-d -i -Z` equal to `-diZ`. In the group, the
 value can be specified only for the last option: `-diZp8080` or `-diZp 8080`
@@ -307,22 +308,22 @@ equal to `-diZ -p 8080`.
 
 ### Positional arguments
 
-Zero positional argument is the full path to the program being launched. This
-value is set automatically.
+Zero positional argument is the full path to the program being launched.
+This value is set automatically.
 
 Starting with the first argument without prefixes `--` and `-` the positional
 arguments are specified are divided with space or can be set at the end of a
-line after a double blank `--` values: `positional arguments [options[[--]
-positional arguments]]`. For examples:
+line after a double blank `--` values: `positional arguments
+[options[[--] positional arguments]]`. For examples:
 
-Double dashes can be ommited if positional argument has no prefix `--` or `-`
-and positional argument not located immediately after a boolean option with
-value by default.
+Double dashes can be ommited if positional argument has no
+prefix `--` or `-` and positional argument not located immediately
+after a boolean option with value by default.
 
-The `one two "three and four" -p8080 --debug` or `-p 8080 --debug -- one two
-"three and four"` or `one -p8080 --debug=true two "three and four"` equal to
-Go-map: `map[string]string{"1": "one", "2": "two", "3": "three and four", "-p":
-"8080", "--debug": "true"}`.
+The `one two "three and four" -p8080 --debug` or `-p 8080 --debug -- one
+two "three and four"` or `one -p8080 --debug=true two "three and
+four"` equal to Go-map: `map[string]string{"1": "one", "2": "two",
+"3": "three and four", "-p": "8080", "--debug": "true"}`.
 
 For example
 
@@ -330,63 +331,5 @@ For example
         Debug int `opt:"d,,,debug"` // boolean option
         Pos []int `opt:"[]"`
     }
-
-## Usage
-
-#### func  Unmarshal
-
-    func Unmarshal(obj interface{}) error
-
-Unmarshal to parses the argument-line options and stores the result in the value
-pointed to by obj. If the obj isn't pointer to struct or is nil - returns an
-error.
-
-Unmarshal method supports the following field's types: int, int8, int16, int32,
-int64, uin, uint8, uin16, uint32, in64, float32, float64, string, bool, url.URL
-and pointers, array or slice from thous types (i.e. *int, ..., []int, ...,
-[]bool, ..., [2]*url.URL, etc.). For other filed's types (like chan, map ...)
-will be returned an error.
-
-Structure fields may have a env tag as `env:"short[,long[,value[,help]]]"`
-where:
-
-    short - short name of the option (one char from the A-Za-z);
-    long - long name of the option (at least two characters);
-    value - default value;
-    help - help information.
-
-Suppose that the some values was set into argument-line as:
-
-    ./main --host=0.0.0.0 -p8080
-
-Structure example:
-
-    // Config structure for containing values from the argument-line.
-    type Config struct {
-        Host string `opt:",host,localhost"`
-        Port int    `opt:"p,port,80,port number"`
-        Help bool   `opt:"h,help"`
-    }
-
-Unmarshal data from the argument-line into Config struct.
-
-    // Important: pointer to initialized structure!
-    var config = &Config{}
-
-    err := opt.Unmarshal(config)
-    if err != nil {
-        // something went wrong
-    }
-
-    config.Host // "0.0.0.0"
-    config.Port // 8080
-
-#### type Helper
-
-    type Helper interface {
-    	HelpOPT() string
-    }
-
-
-Helper is the interface implemented by types that can returns help information
-about app.
+*/
+package opt
