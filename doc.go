@@ -66,7 +66,7 @@ Command-line options are stored in a Go-struct, like this, for example:
 
     // UsageOPT format information about using command line parameters.
     func (a *Args) UsageOPT(name string) string {
-		return "Usage: " + name + "--host, --port[,--config] "
+        return "Usage: " + name + "--host, --port[,--config] "
     }
 
 To import opt package use: `import "github.com/goloop/opt"`
