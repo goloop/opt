@@ -86,7 +86,7 @@ func getHelp(rv reflect.Value, f []*fieldSample, opts optSamples) (r string) {
 		if m := rv.MethodByName("UsageOPT"); m.IsValid() {
 			tmp := m.Call([]reflect.Value{reflect.ValueOf(opts["0"])})
 			value := tmp[0].Interface()
-			r = fmt.Sprintf("%s%s\n", r, value.(string))
+			r = fmt.Sprintf("%s%s", r, value.(string))
 		}
 	} else {
 		r = fmt.Sprintf("%s%s", r, getUsageHelp(f, opts))
