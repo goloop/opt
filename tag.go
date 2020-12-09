@@ -42,7 +42,7 @@ func (args tagSample) IsIgnored() bool {
 
 // The getTagValues returns field valueas as array: [flag, cmd, value, help].
 func getTagValues(tag string) (r [4]string) {
-	var chunks = split(tag, ",")
+	var chunks = splitN(tag, ",", 4)
 	for i, c := range chunks {
 		// Save the last piece without changed.
 		if i == len(r)-1 {
