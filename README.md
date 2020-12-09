@@ -36,39 +36,44 @@ where:
 
 Command-line options are stored in a Go-struct, like this, for example:
 
-    // Args is structure for parsing os.Args data.
-    type Args struct {
-        Help     bool     `opt:"h,help,,show this help"`
-        Verbose  bool     `opt:"v,verbose,true,verbose mode (default true)"`
-        Debug    bool     `opt:"d,debug,,debug mode"`
-        Users    []string `opt:"U,users,{John,Bob,Robert},user list"`
-        Greeting string   `opt:"g,,'Howdy!',greeting message"`
+        // Args is structure for parsing os.Args data.
+        type Args struct {
+            Help     bool     `opt:"h,help,,show this help"`
+            Verbose  bool     `opt:"v,verbose,true,verbose mode (default true)"`
+            Debug    bool     `opt:"d,debug,,debug mode"`
+            Users    []string `opt:"U,users,{John,Bob,Robert},user list"`
+            Greeting string   `opt:"g,,'Howdy!',greeting message"`
 
-        // Special variable that contains whole documentation string has
-        // short option name `?`. This variable will be filled automatically
-        // after parsing the command-line.
-        Doc string `opt:"?"`
+            // Special variable that contains whole documentation string has
+            // short option name `?`. This variable will be filled automatically
+            // after parsing the command-line.
+            Doc string `opt:"?"`
 
-        // To save the path to the app use short option name as `0` (zero).
-        Path string `opt:"0,,,path to app"` // short name as: '0'
+            // To save the path to the app use short option name as `0` (zero).
+            Path string `opt:"0,,,path to app"` // short name as: '0'
 
-        // Positional arguments can be stored in a slice or array.
-        // Note: use either an array or a slice but not both at once
-        // at the same time. Set short option name as `[]`.
-        // ABC [3]int `opt:"[]"` // short name as: '[]'
-        ABC []int `opt:"[]"` // short name as: '[]'
+            // Positional arguments can be stored in a slice or array.
+            // Note: use either an array or a slice but not both at once
+            // at the same time. Set short option name as `[]`.
+            // ABC [3]int `opt:"[]"` // short name as: '[]'
+            ABC []int `opt:"[]"` // short name as: '[]'
 
-        // Distribute positional arguments to fields, use short
-        // option name as: 1,2.. N.
-        A int `opt:"1"` // 1st positional argument
-        B int `opt:"2"` // 2nd positional argument
-        C int `opt:"3"` // 3rd positional argument
-    }
+            // Distribute positional arguments to fields, use short
+            // option name as: 1,2.. N.
+            A int `opt:"1"` // 1st positional argument
+            B int `opt:"2"` // 2nd positional argument
+            C int `opt:"3"` // 3rd positional argument
+        }
 
-    // HelpOPT adds general information to the automatic documentation data.
-    func (a Args) HelpOPT() string {
-        return "Test application for testing opt package features."
-    }
+        // HelpOPT adds general help information about app.
+        func (a *Args) HelpOPT(name string) string {
+            return name + "is test application for testing opt package features."
+        }
+
+        // UsageOPT format information about using command line parameters.
+        func (a *Args) UsageOPT(name string) string {
+    		return "Usage: " + name + "--host, --port[,--config] "
+        }
 
 To import opt package use: `import "github.com/goloop/opt"`
 
@@ -394,9 +399,19 @@ Unmarshal data from the argument-line into Config struct.
 #### type Helper
 
     type Helper interface {
-    	HelpOPT() string
+    	HelpOPT(string) string
     }
 
 
 Helper is the interface implemented by types that can returns help information
 about app.
+
+#### type Usager
+
+    type Usager interface {
+    	UsageOPT(string) string
+    }
+
+
+Usager is the interface implemented by types that can returns information about
+using command line parameters.
