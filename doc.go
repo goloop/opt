@@ -16,7 +16,17 @@ To use this package import it as:
     import "github.com/goloop/opt"
 
 
-## Quick start
+### Tag format
+
+Structure fields may have a opt tag as `opt:"short[,long[,value[,help]]]"`
+where:
+
+    short - short name of the option (one char from the A-Za-z);
+    long - long name of the option (at least two characters);
+    value - default value;
+    help - help information.
+
+### Quick start
 
 Command-line options are stored in a Go-struct, like this, for example:
 

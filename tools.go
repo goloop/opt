@@ -33,16 +33,28 @@ func arg(value string) []string {
 	return strings.Split(value, ":")
 }
 
-// The split splits the string at the specified rune-marker ignoring the
+// The splitN splits the string at the specified rune-marker ignoring the
 // position of the marker inside of the group: `...`, '...', "..."
 // and (...), {...}, [...].
 //
+// Arguments:
+//    str  data;
+//    sep  element separator;
+//    n    the number of strings to be returned by the function.
+//         It can be any of the following:
+//         - n is equal to zero (n == 0): The result is nil, i.e, zero
+//           sub strings. An empty list is returned;
+//         - n is greater than zero (n > 0): At most n sub strings will be
+//           returned and the last string will be the unsplit remainder;
+//         - n is less than zero (n < 0): All possible substring
+//           will be returned.
+//
 // Examples:
-//    split("a,b,c,d", ',')     // ["a", "b", "c", "d"]
-//    split("a,(b,c),d", ',')   // ["a", "(b,c)", "d"]
-//    split("'a,b',c,d", ',')   // ["'a,b'", "c", "d"]
-//    split("a,\"b,c\",d", ',') // ["a", "\"b,c\"", "d"]
-func split(str string, sep string) (r []string) {
+//    splitN("a,b,c,d", ',', -1)     // ["a", "b", "c", "d"]
+//    splitN("a,(b,c),d", ',', -1)   // ["a", "(b,c)", "d"]
+//    splitN("'a,b',c,d", ',', -1)   // ["'a,b'", "c", "d"]
+//    splitN("a,\"b,c\",d", ',', -1) // ["a", "\"b,c\"", "d"]
+func splitN(str, sep string, n int) (r []string) {
 	var (
 		level int
 		host  rune
@@ -53,6 +65,12 @@ func split(str string, sep string) (r []string) {
 		quotes   = "\"'`"
 		brackets = "({["
 	)
+
+	if n == 0 {
+		return r
+	} else if n == 1 {
+		return []string{str}
+	}
 
 	// The contains returns true if all items from the separators
 	// were found in the string and it's all the same.
@@ -73,24 +91,33 @@ func split(str string, sep string) (r []string) {
 	r = make([]string, 0, strings.Count(str, ",")+1)
 
 	// Split value.
-	// for _, char = range str {
 	for i := 0; i < utf8.RuneCountInString(str); i++ {
 		char = rune(str[i])
-		switch {
-		case level == 0 && contains(quotes+brackets, char):
+		if level == 0 && contains(quotes+brackets, char) {
 			host, level = char, level+1
-		case contains(quotes, host, char):
+		} else if contains(quotes, host, char) {
 			level, host = 0, 0
-		case contains(brackets, host, flips[char]):
+		} else if contains(brackets, host, flips[char]) {
 			level--
 			if level <= 0 {
 				level, host = 0, 0
 			}
-		case sep == str[i:i+utf8.RuneCountInString(sep)] && level == 0:
-			i += utf8.RuneCountInString(sep) - 1
-			r = append(r, tmp)
-			tmp = ""
-			continue
+		} else if level == 0 {
+			endpoint := i + utf8.RuneCountInString(sep)
+			if endpoint > len(str) {
+				endpoint = len(str)
+			}
+
+			if sep == str[i:endpoint] {
+				i += utf8.RuneCountInString(sep) - 1
+				r = append(r, tmp)
+				tmp = ""
+				if n > 0 && n == len(r)+1 {
+					tmp = string(str[endpoint:len(str)])
+					break
+				}
+				continue
+			}
 		}
 
 		tmp += string(char)

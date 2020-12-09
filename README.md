@@ -22,7 +22,17 @@ To use this package import it as:
 
     import "github.com/goloop/opt"
 
-## Quick start
+### Tag format
+
+Structure fields may have a opt tag as `opt:"short[,long[,value[,help]]]"`
+where:
+
+    short - short name of the option (one char from the A-Za-z);
+    long - long name of the option (at least two characters);
+    value - default value;
+    help - help information.
+
+### Quick start
 
 Command-line options are stored in a Go-struct, like this, for example:
 
@@ -347,7 +357,7 @@ and pointers, array or slice from thous types (i.e. *int, ..., []int, ...,
 []bool, ..., [2]*url.URL, etc.). For other filed's types (like chan, map ...)
 will be returned an error.
 
-Structure fields may have a env tag as `env:"short[,long[,value[,help]]]"`
+Structure fields may have a opt tag as `opt:"short[,long[,value[,help]]]"`
 where:
 
     short - short name of the option (one char from the A-Za-z);
