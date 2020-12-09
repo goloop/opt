@@ -16,7 +16,7 @@ type Helper interface {
 // Usager is the interface implemented by types that can
 // returns information about using command line parameters.
 type Usager interface {
-	UsageOPT(string) string
+	UsageOPT(string, map[string]string) string
 }
 
 // posArgsNum structure for calculating positional arguments and
@@ -82,11 +82,14 @@ func getHelp(rv reflect.Value, f []*fieldSample, opts optSamples) (r string) {
 
 	// If objects implements Usager interface try to calling
 	// a custom Usage method.
-	if rv.Type().Implements(reflect.TypeOf((*Helper)(nil)).Elem()) {
+	if rv.Type().Implements(reflect.TypeOf((*Usager)(nil)).Elem()) {
 		if m := rv.MethodByName("UsageOPT"); m.IsValid() {
-			tmp := m.Call([]reflect.Value{reflect.ValueOf(opts["0"])})
+			tmp := m.Call([]reflect.Value{
+				reflect.ValueOf(opts["0"]),
+				reflect.ValueOf(map[string]string(opts)),
+			})
 			value := tmp[0].Interface()
-			r = fmt.Sprintf("%s\n", value.(string))
+			r = fmt.Sprintf("%s%s\n", r, value.(string))
 		}
 	} else {
 		r = fmt.Sprintf("%s%s", r, getUsageHelp(f, opts))
