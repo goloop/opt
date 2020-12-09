@@ -11,12 +11,13 @@ var (
 	longRgx  = regexp.MustCompile(`^[a-z]{1}[a-z\-1-9]{1,}$`)
 )
 
-// The tagSample is struct of the fields of the tag for env's package.
-// Tag example: "env:[kye,[value,[sep]]]" where:
+// The tagSample is struct of the fields of the tag for opt's package.
+// Tag example: "opt:[short[,long[,value[,help]]]]" where:
 //
-//    key   key name in the environment;
-//    value default value for this key;
-//    sep   list separator (default ":").
+//    short - short name of the option (one char from the A-Za-z);
+//    long - long name of the option (at least two characters);
+//    value - default value;
+//    help - help information.
 type tagSample struct {
 	Short string
 	Long  string
