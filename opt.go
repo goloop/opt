@@ -12,7 +12,7 @@ import "os"
 // []int, ..., []bool, ..., [2]*url.URL, etc.).
 // For other filed's types (like chan, map ...) will be returned an error.
 //
-// Structure fields may have a env tag as `env:"short[,long[,value[,help]]]"`
+// Structure fields may have a opt tag as `opt:"short[,long[,value[,help]]]"`
 // where:
 //
 //    short - short name of the option (one char from the A-Za-z);
