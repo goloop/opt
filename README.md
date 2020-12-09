@@ -74,7 +74,7 @@ Command-line options are stored in a Go-struct, like this, for example:
     }
 
     // UsageOPT format information about using command line parameters.
-    func (a *Args) UsageOPT(path string, opts map[string]string) string {
+    func (a *Args) UsageOPT(path string) string {
         _, name := filepath.Split(path)
         return "Usage: " + name + " --host, --port[,--config] "
     }
@@ -413,7 +413,7 @@ about app.
 #### type Usager
 
     type Usager interface {
-    	UsageOPT(string, map[string]string) string
+    	UsageOPT(string) string
     }
 
 
