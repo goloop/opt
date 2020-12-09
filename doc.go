@@ -59,9 +59,14 @@ Command-line options are stored in a Go-struct, like this, for example:
         C int `opt:"3"` // 3rd positional argument
     }
 
-    // HelpOPT adds general information to the automatic documentation data.
-    func (a Args) HelpOPT() string {
-        return "Test application for testing opt package features."
+    // HelpOPT adds general help information about app.
+    func (a *Args) HelpOPT(name string) string {
+        return name + "is test application for testing opt package features."
+    }
+
+    // UsageOPT format information about using command line parameters.
+    func (a *Args) UsageOPT(name string) string {
+		return "Usage: " + name + "--host, --port[,--config] "
     }
 
 To import opt package use: `import "github.com/goloop/opt"`

@@ -10,7 +10,13 @@ import (
 // Helper is the interface implemented by types that can
 // returns help information about app.
 type Helper interface {
-	HelpOPT() string
+	HelpOPT(string) string
+}
+
+// Usager is the interface implemented by types that can
+// returns information about using command line parameters.
+type Usager interface {
+	UsageOPT(string) string
 }
 
 // posArgsNum structure for calculating positional arguments and
@@ -64,17 +70,27 @@ func (pan *posArgsNum) Spec() string {
 
 // The getHelp returns automatically generated help information.
 func getHelp(rv reflect.Value, f []*fieldSample, opts optSamples) (r string) {
-	// If objects implements Unmarshaler interface try to calling
-	// a custom Unmarshal method.
+	// If objects implements Helper interface try to calling
+	// a custom Help method.
 	if rv.Type().Implements(reflect.TypeOf((*Helper)(nil)).Elem()) {
 		if m := rv.MethodByName("HelpOPT"); m.IsValid() {
-			tmp := m.Call([]reflect.Value{})
+			tmp := m.Call([]reflect.Value{reflect.ValueOf(opts["0"])})
 			value := tmp[0].Interface()
 			r = fmt.Sprintf("%s\n\n", value.(string))
 		}
 	}
 
-	r = fmt.Sprintf("%s%s", r, getUsageHelp(f, opts))
+	// If objects implements Usager interface try to calling
+	// a custom Usage method.
+	if rv.Type().Implements(reflect.TypeOf((*Helper)(nil)).Elem()) {
+		if m := rv.MethodByName("UsageOPT"); m.IsValid() {
+			tmp := m.Call([]reflect.Value{reflect.ValueOf(opts["0"])})
+			value := tmp[0].Interface()
+			r = fmt.Sprintf("%s\n", value.(string))
+		}
+	} else {
+		r = fmt.Sprintf("%s%s", r, getUsageHelp(f, opts))
+	}
 	r = fmt.Sprintf("%s%s\n", r, getArgumentsHelp(f))
 
 	return
