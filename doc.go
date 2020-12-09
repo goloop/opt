@@ -30,6 +30,8 @@ where:
 
 Command-line options are stored in a Go-struct, like this, for example:
 
+    import "path/filepath"
+
     // Args is structure for parsing os.Args data.
     type Args struct {
         Help     bool     `opt:"h,help,,show this help"`
@@ -60,13 +62,15 @@ Command-line options are stored in a Go-struct, like this, for example:
     }
 
     // HelpOPT adds general help information about app.
-    func (a *Args) HelpOPT(name string) string {
+    func (a *Args) HelpOPT(path string) string {
+        _, name := filepath.Split(path)
         return name + "is test application for testing opt package features."
     }
 
     // UsageOPT format information about using command line parameters.
-    func (a *Args) UsageOPT(name string) string {
-        return "Usage: " + name + "--host, --port[,--config] "
+    func (a *Args) UsageOPT(path string, opts map[string]string) string {
+        _, name := filepath.Split(path)
+        return "Usage: " + name + " --host, --port[,--config] "
     }
 
 To import opt package use: `import "github.com/goloop/opt"`
