@@ -6,6 +6,8 @@
 
 *Version: 0.1.4*
 
+**no supported**
+
 # opt
 
 The opt module implements methods for manage arguments of the command-line.
