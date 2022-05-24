@@ -3,8 +3,10 @@ package opt
 import (
 	"fmt"
 	"math"
+	"net/url"
 	"reflect"
 	"strconv"
+	"strings"
 	"testing"
 )
 
@@ -23,81 +25,460 @@ type BoolDataTestType struct {
 	Correct bool
 }
 
-// TestUnmarshalOPT classic test for unmarshalOPT function.
-func TestUnmarshalOPT(t *testing.T) {
+// TestUnmarshalOpt is classic test for unmarshalOpt function.
+func TestUnmarshalOpt(t *testing.T) {
 	type data struct {
-		Help  bool   `opt:"h,help,,show help information"`
-		Debug bool   `opt:"d,debug,true,debug mode"`
-		Host  string `opt:",host,localhost,host name"`
-		Port  int    `opt:"p,port,8080,port number"`
+		Help  bool   `opt:"h" alt:"help" help:"show help information"`
+		Debug bool   `opt:"debug" alt:"d" def:"true" help:"debug mode"`
+		Host  string `opt:"host" def:"localhost" help:"host name"`
+		Port  int    `opt:"p" alt:"port" def:"8080" help:"port number"`
+
+		MemorySize int    `def:"1024"` // default value
+		UserName   string // default long flag user-name
+		Ignored    bool   `opt:"-"` // ignored
 	}
 
 	// Data for testing.
-	var tests = [][]string{
-		arg("/main:--host=0.0.0.0:-p8000:-d:false"),
-		arg("/main:--host:0.0.0.0:-p:8000:-dfalse"),
-		arg("/main:-p:8000:--host:0.0.0.0:--no-debug"),
-		arg("/main:-p:8000:--host:0.0.0.0:-d:false"),
+	exp := "false:false:0.0.0.0:8000:Goloop:1024"
+	tests := [][]string{
+		split("/app:--host=0.0.0.0:-p8000:-d:false:--user-name:Goloop"),
+		split("/app:--host:0.0.0.0:--user-name:Goloop:-p:8000:-dfalse"),
+		split("/app:--user-name:Goloop:-p:8000:--host:0.0.0.0:--no-debug"),
+		split("/app:-p:8000:--host:0.0.0.0:--user-name:Goloop:-d:false"),
 	}
 
 	// Testing.
-	for _, args := range tests {
+	for i, args := range tests {
 		d := data{}
-		err := unmarshalOPT(&d, args)
-		if err != nil {
+		if err := unmarshalOpt(&d, args); err != nil {
 			t.Error(err)
 		}
 
-		v := fmt.Sprintf("h:%t;d:%t;h:%s;p:%d", d.Help,
-			d.Debug, d.Host, d.Port)
-		if v != "h:false;d:false;h:0.0.0.0;p:8000" {
-			t.Error("incorrect:", v)
+		v := fmt.Sprintf(
+			"%v:%v:%s:%d:%s:%d",
+			d.Help, d.Debug, d.Host, d.Port, d.UserName, d.MemorySize,
+		)
+		if v != exp {
+			t.Errorf("%d test, expected %v but %v", i, exp, v)
 		}
 	}
 }
 
-// TestUnmarshalOPTNotPointer tests unmarshalOPT for the correct handling
-// of an exception for a non-pointer value.
-func TestUnmarshalOPTNotPointer(t *testing.T) {
-	type data struct{}
-	if err := unmarshalOPT(data{}, []string{"/main", "5", "10"}); err == nil {
-		t.Error("an error is expected for non-pointer value")
-	}
-}
-
-// TestUnmarshalOPTNotInitialized tests unmarshalOPT for the correct handling
-// of an exception for a not initialized value.
-func TestUnmarshalOPTNotInitialized(t *testing.T) {
-	type data struct{}
-	var d *data
-	if err := unmarshalOPT(d, []string{"/main", "5", "10", "15"}); err == nil {
-		t.Error("an error is expected for not initialized value")
-	}
-}
-
-// TestUnmarshalOPTNotStruct tests unmarshalOPT for the correct handling
-// of an exception for a value that isn't a struct.
-func TestUnmarshalOPTNotStruct(t *testing.T) {
-	var d = new(int)
-	if err := unmarshalOPT(d, []string{"/main", "5", "10"}); err == nil {
-		t.Error("an error is expected for a pointer not to a struct")
-	}
-}
-
-// TestUnmarshalOPTPositional tests unmarshalOPT for positional arguments.
-func TestUnmarshalOPTPositional(t *testing.T) {
+// TestUnmarshalOptMix tests unmarshalOpt with mixed flags.
+// Changes the order of the flags, uppercase and lowercase for long flags etc.
+func TestUnmarshalOptMix(t *testing.T) {
 	type data struct {
-		Path string `opt:"0,,,path to bin file"`
+		Verbose  bool     `opt:"v" alt:"verbose" help:"verbose output"`
+		Debug    bool     `opt:"debug" alt:"d" help:"debug mode"`
+		Users    []string `opt:"users" alt:"U" def:"John,Bob,Robert" sep:","`
+		Geometry string   `opt:"g" def:"T B"`
+		Path     string   `opt:"0"`
+		A        int      `opt:"1" def:"5"`
+		B        int      `opt:"2" def:"10"`
+		C        int      `opt:"3" def:"15"`
+	}
+
+	tests := [][]string{
+		split("./app:-dUJack:-U:Bob:--users=Roy:--no-verbose:-gL R:5:10:15"),
+		split("./app:-dU:Jack:-U:Bob:--USERS=Roy:--No-Verbose:-g:L R:5:10:15"),
+		split("./app:-d:--users:Jack,Bob,Roy:--no-verbose:-gL R:5:10:15"),
+		split("./app:-g:L R:-U:Jack:-UBob:-URoy:--no-verbose:-d:--:5:10:15"),
+		split("./app:5:-dU:Jack:--users:Bob,Roy:--verbose:false:-gL R:10:15"),
+		split("./app:5:10:--no-verboSe:-dU:Jack:-U:Bob:-U:Roy:-g:L R:15"),
+		split("./app:5:10:15:-UJack:-UBob:-URoy:--verbose=false:-g:L R:-d"),
+		split("./app:5:10:15:-U:Jack:-UBob:-URoy:-d:--VERBOSE:false:-gL R"),
+		split("./app:5:-UJack:--no-verbose:-gL R:-UBob:-d:true:-URoy:10:15"),
+		split("./app:5:-UJack:-UBob:--verbose:false:-URoy:-gL R:-d:--:10:15"),
+		split("./app:5:-UJack,Bob,Roy:-gL R:-d:--no-verbose:--:10:15"),
+		split("./app:5:-UJack:--no-verbose:-gL R:-UBob:-d:true:-URoy:10"),
+		split("./app:-UJack:-UBob:--verbose:false:-URoy:-gL R:-d:--:5"),
+		split("./app:-UJack,Bob,Roy:-gL R:-d:--no-verbose"),
+	}
+
+	exp := data{
+		Verbose:  false,
+		Debug:    true,
+		Users:    []string{"Jack", "Bob", "Roy"},
+		Geometry: "L R",
+		Path:     "./app",
+		A:        5,
+		B:        10,
+		C:        15,
+	}
+
+	for i, test := range tests {
+		var d = data{}
+		if err := unmarshalOpt(&d, test); err != nil {
+			t.Error(err)
+			return // it makes no sense to display all errors
+		}
+
+		if !reflect.DeepEqual(exp, d) {
+			t.Errorf("%d test, expected %v but %v", i, exp, d)
+		}
+	}
+}
+
+// TestWrongArgs tests with wrong value.
+func TestWrongArgs(t *testing.T) {
+	type data struct {
+		Words   []string `opt:"w" alt:"word" def:"One Two Three Four"`
+		Debug   bool     `opt:"debug" alt:"d" help:"debug mode"`
+		InSlice []int    `opt:"s" def:"1,2,3" sep:","`
+		InArray [3]int   `opt:"a" def:"1,2,3" sep:","`
+		Uint    uint     `def:"1"`
+		Float   float64  `def:"1.3"`
+	}
+
+	split := func(str string) []string { return strings.Split(str, ":") }
+
+	// Undeclared tag.
+	obj := data{}
+	test := split("./app:-d:--user:John") // -U isn't declared
+	if err := unmarshalOpt(&obj, test); err == nil {
+		t.Error("expected error")
+	}
+
+	// List to single value.
+	obj = data{}
+	test = split("./app:-d:true:-d:-dfalse") // -d should be false
+	if err := unmarshalOpt(&obj, test); err != nil {
+		t.Error(err)
+	}
+
+	if obj.Debug {
+		t.Error("expected true")
+	}
+
+	// Slice and Array.
+	obj = data{}
+	test = split("./app:-s:7:-s:5:-s3:-a:7,5,3")
+	if err := unmarshalOpt(&obj, test); err != nil {
+		t.Error(err)
+	}
+
+	if e := []int{7, 5, 3}; !reflect.DeepEqual(e, obj.InSlice) {
+		t.Errorf("expected %v but %v", e, obj.InSlice)
+	}
+
+	if e := [3]int{7, 5, 3}; !reflect.DeepEqual(e, obj.InArray) {
+		t.Errorf("expected %v but %v", e, obj.InSlice)
+	}
+
+	// Default Slice and Array.
+	obj = data{}
+	test = split("./app:-a:7,5:-a3")
+	if err := unmarshalOpt(&obj, test); err != nil {
+		t.Error(err)
+	}
+
+	if e := []int{1, 2, 3}; !reflect.DeepEqual(e, obj.InSlice) {
+		t.Errorf("expected %v but %v", e, obj.InSlice)
+	}
+
+	if e := [3]int{7, 5, 3}; !reflect.DeepEqual(e, obj.InArray) {
+		t.Errorf("expected %v but %v", e, obj.InSlice)
+	}
+
+	if obj.Uint != 1 {
+		t.Errorf("expected %v but %v", 1, obj.Uint)
+	}
+
+	if obj.Float != 1.3 {
+		t.Errorf("expected %v but %v", 1.3, obj.Float)
+	}
+
+	// Array overflow..
+	obj = data{}
+	test = split("./app:-a:7,5:-a3,1")
+	if err := unmarshalOpt(&obj, test); err == nil {
+		t.Error("expected error")
+	}
+
+	// Slice and Array incorrect values.
+	obj = data{}
+	test = split("./app:-s:a,b,c")
+	if err := unmarshalOpt(&obj, test); err == nil {
+		t.Error("expected error")
+	}
+
+	test = split("./app:-a:a,b:-ac")
+	if err := unmarshalOpt(&obj, test); err == nil {
+		t.Error("expected error")
+	}
+}
+
+// TestUnmarshalOptLongName tests unmarshalOpt with a long name.
+func TestUnmarshalOptLongName(t *testing.T) {
+	// Note: An incorrect storage object causes the function to cause panic!
+	defer func() {
+		if err := recover(); err == nil {
+			t.Error("an error is expected for long option name")
+		}
+	}()
+
+	type data struct { // |******************************| ______ max 32 chars
+		Name string `opt:"very-lon-flag-name-one-two-three-x"`
+	}
+	unmarshalOpt(&data{}, []string{"/app", "5", "10"}) // panic is expected
+}
+
+// TestUnmarshalOptNotPointer tests unmarshalOpt with a non-pointer object.
+func TestUnmarshalOptNotPointer(t *testing.T) {
+	// Note: An incorrect storage object causes the function to cause panic!
+	defer func() {
+		if err := recover(); err == nil {
+			t.Error("an error is expected for non-pointer object")
+		}
+	}()
+
+	type data struct{}
+	unmarshalOpt(data{}, []string{"/app", "5", "10"}) // panic is expected
+}
+
+// TestUnmarshalOptNotInitialized tests unmarshalOpt
+// with a not initialized object.
+func TestUnmarshalOptNotInitialized(t *testing.T) {
+	// Note: An incorrect storage object causes the function to cause panic!
+	defer func() {
+		if err := recover(); err == nil {
+			t.Error("an error is expected for not initialized object")
+		}
+	}()
+
+	var d *struct{}
+	unmarshalOpt(d, []string{"/app", "5", "10", "15"}) // panic is expected
+}
+
+// TestUnmarshalOptNotStruct tests unmarshalOpt
+// with a object that isn't a struct.
+func TestUnmarshalOptNotStruct(t *testing.T) {
+	// Note: An incorrect storage object causes the function to cause panic!
+	defer func() {
+		if err := recover(); err == nil {
+			t.Error("an error is expected for a non-struct pointer")
+		}
+	}()
+
+	var d = new(int)
+	unmarshalOpt(d, []string{"/app", "5", "10"}) // panic is expected
+}
+
+// TestOverflow tests with struct.
+func TestOverflow(t *testing.T) {
+	split := func(str string) []string { return strings.Split(str, ":") }
+
+	test := split("./app:--int:999999999999999999999999999999999999999999999")
+	i := struct{ Int int }{}
+	if err := unmarshalOpt(&i, test); err == nil {
+		t.Error("expected an error")
+	}
+
+	test = split("./app:--uint:999999999999999999999999999999999999999999999")
+	u := struct{ Uint uint }{}
+	if err := unmarshalOpt(&u, test); err == nil {
+		t.Error("expected an error")
+	}
+
+	test = split("./app:--float:99999999999999999999999999999999999999999999")
+	f := struct{ Float float32 }{}
+	if err := unmarshalOpt(&f, test); err == nil {
+		t.Error("expected an error")
+	}
+}
+
+// TestUnmarshalOptBoolWrong tests unmarshalOpt with wrong bool.
+func TestUnmarshalOptBoolWrong(t *testing.T) {
+	var b bool
+	split := func(str string) []string { return strings.Split(str, ":") }
+	objPtr := struct {
+		Bool *bool
+	}{&b}
+
+	test := split("./app:--bool:yes")
+	if err := unmarshalOpt(&objPtr, test); err == nil {
+		t.Error("expected error")
+	}
+
+	// ...
+	objElem := struct {
+		Bool bool
+	}{}
+
+	test = split("./app:--bool:yes")
+	if err := unmarshalOpt(&objElem, test); err == nil {
+		t.Error("expected error")
+	}
+}
+
+// TestWrongList tests with wrong list.
+func TestWrongList(t *testing.T) {
+	split := func(str string) []string { return strings.Split(str, ":") }
+	objSlice := struct {
+		Slice []chan int `opt:"slice" def:"a"`
+	}{}
+
+	test := split("./app:--slice:c")
+	if err := unmarshalOpt(&objSlice, test); err == nil {
+		t.Error("expected error")
+	}
+
+	objArray := struct {
+		Array []chan int `opt:"array" def:"a"`
+	}{}
+
+	test = split("./app:--array:c")
+	if err := unmarshalOpt(&objArray, test); err == nil {
+		t.Error("expected error")
+	}
+}
+
+// TestStructUrl tests with pointer on struct.
+func TestStructUrl(t *testing.T) {
+	var (
+		site url.URL
+	)
+
+	split := func(str string) []string { return strings.Split(str, ":") }
+	test := split("./app:--site:%$")
+
+	// Pointer on the url.URL.
+	objOk := struct {
+		Site *url.URL `opt:"site"`
+	}{
+		Site: &site,
+	}
+	if err := unmarshalOpt(&objOk, test); err == nil {
+		t.Error("expected en error")
+	}
+
+	objElem := struct {
+		Site url.URL `opt:"site"`
+	}{}
+	if err := unmarshalOpt(&objElem, test); err == nil {
+		t.Error("expected en error")
+	}
+}
+
+// TestStruct tests with struct.
+func TestStruct(t *testing.T) {
+	type data struct{}
+
+	split := func(str string) []string { return strings.Split(str, ":") }
+	test := split("./app:--site:example.com:--site:example.com")
+
+	// Pointer on the url.URL.
+	objOk := struct {
+		Site url.URL `opt:"site"`
+	}{}
+	if err := unmarshalOpt(&objOk, test); err != nil {
+		t.Error(err)
+	}
+
+	// Panic for struct.
+	defer func() {
+		if r := recover(); r == nil {
+			t.Errorf("expected error for pointer ont the struct")
+		}
+	}()
+
+	objErr := struct {
+		Any data `opt:"any"`
+	}{}
+	unmarshalOpt(&objErr, test)
+}
+
+// TestPtr tests with pointers.
+func TestPtr(t *testing.T) {
+	type data struct {
+		Debug bool `opt:"debug" alt:"d" help:"debug mode"`
+		Age   *int `opt:"age"`
+	}
+
+	var age int
+	split := func(str string) []string { return strings.Split(str, ":") }
+
+	// Pointer int.
+	obj := data{Age: &age}
+	test := split("./app:--age:99")
+	if err := unmarshalOpt(&obj, test); err != nil {
+		t.Error(err)
+	}
+
+	// Not initialized pointer.
+	obj = data{}
+	test = split("./app:--age:99")
+	if err := unmarshalOpt(&obj, test); err == nil {
+		t.Error("expected error")
+	}
+}
+
+// TestStructPtr tests with pointer on struct.
+func TestStructPtr(t *testing.T) {
+	type data struct{}
+
+	var (
+		site url.URL
+		any  data
+
+		i int
+		u uint
+		f float32
+	)
+
+	split := func(str string) []string { return strings.Split(str, ":") }
+	test := split("./app:--site:example.com:--site:example.com:" +
+		"--uint:3:--int:5:--float:7")
+
+	// Pointer on the url.URL.
+	objOk := struct {
+		Site  *url.URL `opt:"site"`
+		Uint  *uint
+		Int   *int
+		Float *float32
+	}{
+		Site:  &site,
+		Int:   &i,
+		Uint:  &u,
+		Float: &f,
+	}
+	if err := unmarshalOpt(&objOk, test); err != nil {
+		t.Error(err)
+	}
+
+	test = split("./app:--site:10")
+	if err := unmarshalOpt(&objOk, test); err != nil {
+		t.Error(err)
+	}
+
+	// Panic for struct.
+	defer func() {
+		if r := recover(); r == nil {
+			t.Errorf("expected error for pointer on the struct")
+		}
+	}()
+
+	objErr := struct {
+		Any *data `opt:"any"`
+	}{
+		Any: &any,
+	}
+	unmarshalOpt(&objErr, test)
+}
+
+// TestUnmarshalOptPositional tests unmarshalOpt for positional arguments.
+func TestUnmarshalOptPositional(t *testing.T) {
+	type data struct {
+		Path string `opt:"0" help:"path to bin file"`
 		A    int    `opt:"1"`
 		B    int    `opt:"2"`
 		C    int    `opt:"3"`
-		ABC  []int  `opt:"[],,,position args as list"`
+		ABC  []int  `opt:"[]" help:"position args as list"`
 	}
 
 	var d, sum = data{}, 0
 
-	err := unmarshalOPT(&d, []string{"/main", "5", "10", "15"})
-	if err != nil {
+	if err := unmarshalOpt(&d, []string{"/app", "5", "10", "15"}); err != nil {
 		t.Error(err)
 	}
 
@@ -113,7 +494,7 @@ func TestUnmarshalOPTPositional(t *testing.T) {
 	}
 
 	// Check path value.
-	if d.Path != "/main" {
+	if d.Path != "/app" {
 		t.Error("incorrect parser bin path:", d.Path)
 	}
 
@@ -122,74 +503,8 @@ func TestUnmarshalOPTPositional(t *testing.T) {
 		t.Error("order expected 5 10 15 but", d.A, d.B, d.C)
 	}
 
-	if sts(d.ABC, " ") != "5 10 15" {
-		t.Error("order expected 5 10 15 but", sts(d.ABC, " "))
-	}
-}
-
-// TestUnmarshalOPTMix random opt testing.
-func TestUnmarshalOPTMix(t *testing.T) {
-	type data struct {
-		Verbose  bool     `opt:"v,verb,true,verbose output"`
-		Debug    bool     `opt:"d,debug,,debug mode"`
-		Users    []string `opt:"U,users,{John,Bob,Robert},user list"`
-		Greeting string   `opt:"g,,'Hello, world!',greeting message"`
-		Path     string   `opt:"0,,,path to bin"`
-		A        int      `opt:"1"`
-		B        int      `opt:"2"`
-		C        int      `opt:"3"`
-		ABC      []int    `opt:"[]"`
-	}
-
-	// Data for testing.
-	var tests = [][]string{
-		arg("/main:-dU Jack,Harry:--no-verb:-g Hi, all:5:10:15"),
-		arg("/main:-d:-U Jack,Harry:--no-verb:-g Hi, all:--:5:10:15"),
-		arg("/main:-dU Jack,Harry:--verb false:-g Hi, all:5:10:15"),
-		arg("/main:-dU Jack,Harry:--no-verb true:-g Hi, all:5:10:15"),
-		arg("/main:-dUJack,Harry:--verb=false:-gHi, all:5:10:15"),
-		arg("/main:5:10:15:-dUJack,Harry:--verb false:-gHi, all"),
-		arg("/main:5:10:15:-UJack,Harry:--verb false:-gHi, all:-d true"),
-		arg("/main:5:-UJack,Harry:--verb false:-gHi, all:-d:--:10:15"),
-	}
-
-	// Correct tests.
-	for _, test := range tests {
-		var d = data{}
-		err := unmarshalOPT(&d, test)
-		if err != nil {
-			t.Error(err)
-		}
-
-		// Check fields:
-		if d.Verbose {
-			t.Errorf("incorrect d.Verbose==%t for: %v", d.Verbose, test)
-		}
-
-		if !d.Debug {
-			t.Errorf("incorrect d.Debug==%t for: %v", d.Debug, test)
-		}
-
-		if sts(d.Users, ":") != sts([]string{"Jack", "Harry"}, ":") {
-			t.Errorf("incorrect d.Users==%v for: %v", d.Users, test)
-		}
-
-		if d.Greeting != "Hi, all" {
-			t.Errorf("incorrect d.Greeting==%s for: %v", d.Greeting, test)
-		}
-
-		if (d.A != 5 || d.B != 10) || d.C != 15 {
-			t.Errorf("incorrect d.A==%d d.B==%d d.C==%d for: %v",
-				d.A, d.B, d.C, test)
-		}
-
-		if sts(d.ABC, ":") != sts([]int{5, 10, 15}, ":") {
-			t.Errorf("incorrect d.ABC==%v for: %v", d.ABC, test)
-		}
-
-		if d.Path != "/main" {
-			t.Error("incorrect parser bin path:", d.Path)
-		}
+	if tmp := []int{5, 10, 15}; !reflect.DeepEqual(tmp, d.ABC) {
+		t.Errorf("order expected %v but %v", tmp, d.ABC)
 	}
 }
 
@@ -231,11 +546,11 @@ func TestStrToBool(t *testing.T) {
 func TestStrToIntKind(t *testing.T) {
 	var (
 		tests    []UIFDataTestType
-		maxInt   string = fmt.Sprintf("%d", math.MaxInt64-1)
-		maxInt8  string = fmt.Sprintf("%d", math.MaxInt8-1)
-		maxInt16 string = fmt.Sprintf("%d", math.MaxInt16-1)
-		maxInt32 string = fmt.Sprintf("%d", math.MaxInt32-1)
-		maxInt64 string = fmt.Sprintf("%d", math.MaxInt64-1)
+		maxInt   = fmt.Sprintf("%d", math.MaxInt64-1)
+		maxInt8  = fmt.Sprintf("%d", math.MaxInt8-1)
+		maxInt16 = fmt.Sprintf("%d", math.MaxInt16-1)
+		maxInt32 = fmt.Sprintf("%d", math.MaxInt32-1)
+		maxInt64 = fmt.Sprintf("%d", math.MaxInt64-1)
 	)
 
 	// For 32-bit platform.
@@ -264,9 +579,9 @@ func TestStrToIntKind(t *testing.T) {
 		{"3" + maxInt8, "0", false, reflect.Int8},
 		{"-129", "0", false, reflect.Int8},
 		{"128", "0", false, reflect.Int8},
-		{"3" + maxInt16, "0", false, reflect.Int16},
-		{"3" + maxInt32, "0", false, reflect.Int32},
-		{"3" + maxInt64, "0", false, reflect.Int64},
+		{maxInt16 + "0", "0", false, reflect.Int16},
+		{maxInt32 + "0", "0", false, reflect.Int32},
+		{maxInt64 + "0", "0", false, reflect.Int64},
 		{"0", "0", false, reflect.Slice},
 	}
 
@@ -292,11 +607,11 @@ func TestStrToIntKind(t *testing.T) {
 func TestStrToUintKind(t *testing.T) {
 	var (
 		tests     []UIFDataTestType
-		maxUint   string = "18446744073709551614"
-		maxUint8  string = fmt.Sprintf("%d", math.MaxUint8-1)
-		maxUint16 string = fmt.Sprintf("%d", math.MaxUint16-1)
-		maxUint32 string = fmt.Sprintf("%d", math.MaxUint32-1)
-		maxUint64 string = "18446744073709551614"
+		maxUint   = "18446744073709551614"
+		maxUint8  = fmt.Sprintf("%d", math.MaxUint8-1)
+		maxUint16 = fmt.Sprintf("%d", math.MaxUint16-1)
+		maxUint32 = fmt.Sprintf("%d", math.MaxUint32-1)
+		maxUint64 = "18446744073709551614"
 	)
 
 	// For 32-bit platform.
@@ -347,8 +662,8 @@ func TestStrToUintKind(t *testing.T) {
 func TestStrToFloatKind(t *testing.T) {
 	var (
 		tests      []UIFDataTestType
-		maxFloat32 string = fmt.Sprintf("%.2f", math.MaxFloat32-1)
-		maxFloat64 string = fmt.Sprintf("%.2f", math.MaxFloat64-1)
+		maxFloat32 = fmt.Sprintf("%.2f", math.MaxFloat32-1)
+		maxFloat64 = fmt.Sprintf("%.2f", math.MaxFloat64-1)
 	)
 
 	// Test data.
