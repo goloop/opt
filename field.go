@@ -159,11 +159,11 @@ func getFieldCastList(obj interface{}) (fieldCastList, error) {
 		case f == "[]" && kind != reflect.Array && kind != reflect.Slice:
 			// To load positional arguments,
 			// the field must be of the slice type.
-			err = fmt.Errorf("%s field should be a slice", fc.fieldName)
+			err = fmt.Errorf("%s field should be a list", fc.fieldName)
 		case kind == reflect.Struct:
 			// Supported url.URL struct only.
 			if fc.item.Type() != reflect.TypeOf(url.URL{}) {
-				err = fmt.Errorf("%s field has ivalid type", fc.fieldName)
+				err = fmt.Errorf("%s field has invalid type", fc.fieldName)
 			}
 		case kind == reflect.Ptr:
 			// Pointer to the structure *url.URL only.

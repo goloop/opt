@@ -221,7 +221,7 @@ You can use the following tags to configure command line parsing rules:
 - spe - if the field is a list, indicates the delimiter of the list;
 - help - short description of the option.
 
-### opt
+### Tag `opt`
 
 Specifies the name of the short or long flag whose data must be entered in the appropriate field. If no tag is specified, it will be automatically set to the value of the field name converted to kebab-case. For example: `UserName` converts to `user-name`. 
 
@@ -258,7 +258,7 @@ fmt.Println("Positional:", args.Positional)
 //  Positional: [1 2 3]
 ```
 
-### alt
+### Tag `alt`
 
 Sets the alternate flag name of opt value. For example, if opt has value of the long flag name, then alt can take the value of the short ensign and vice versa. The values of opt and alt cannot be either a long or a short flag name at the same time.
 
@@ -291,7 +291,7 @@ Can handle the following command line arguments:
 ./app --host=localhost --port=80
 ```
 
-### def
+### Tag `def`
 
 Sets the default value of the field. To set a bool value are used `true` or `false`. To set a list value are used elements of the corresponding type separated by some separator are used. The delimiter type must be specified in the sep tag. For example: `./app`
 
@@ -330,7 +330,7 @@ To pass the list, you can use the flag for each new argument or write them throu
 ./app -p 8080 -A23/25/27 -UJohn,Bob,Roy
 ```
 
-### sep
+### Tag `sep`
 
 Specifies the symbol to divide the list into items. Relevant in list type fields only. By default is empty - forbids passing the list as one value (ie, you need to use a flag for each item, for example: `-A23 -A20 -A30` but it is impossible somehow so: `-A23,25,27`).
 
@@ -358,7 +358,7 @@ fmt.Println("ListC:", args.ListC, "len:", len(args.ListC))
 //  ListC: [23,25 27] len: 2
 ```
 
-### help
+### Tag `help`
 
 The tag is used to briefly describe the arguments of the command line. If the tag is empty - the argument isn't displayed in the auto-generated help information. For example: `./app -h`
 
@@ -390,6 +390,62 @@ if args.Help {
 //  The app takes an one of positional argument, including:
 //       1 configuration file.
 ```
+
+## Panic or error
+
+The Unmarshal function can cause panic or return an error. Panic occurs only when there is a development problem. The error occurs when the user has transmitted incorrect data.
+
+### Panic
+
+Panic occurs when the structure contains incorrect parsing fields or other technical problems. For example:
+
+- the object is not transmitted by pointer;
+- a non-string type field is specified for the `opt:"?"` documentation field;
+- field for positional arguments `opt:"[]"` is not a list (slice/array);
+- field has structure type (except url.URL);
+- field has pointer to structure type (except *url.URL).
+
+```go
+var args = struct {
+	Doc int      `opt:"?"`  // panic: Doc field should be a string
+	Pos string   `opt:"[]"` // panic: Pos field should be a list
+	One struct{}            // panic: One field has invalid type
+	Two struct{} `opt:"-"`  // it's normal, the field is ignored
+}{}
+
+// panic: obj should be a pointer to an initialized struct
+if err := opt.Unmarshal(args); err != nil {
+	log.Fatal(err)
+}
+```
+
+### Error
+
+Error occurs when it is impossible to parse the command line passed by the user. For example:
+
+- a flag is used that is not specified in the argument object;
+- the specified argument value does not match the field type;
+- for array (overflow) specified too large list;
+- value is too large or too small for numeric fields.
+
+```go
+var args = struct {
+	Host string `opt:"host" alt:"H" help:"host of the server"`
+	Port int    `opt:"port" alt:"p" help:"port of the server"`
+	Help bool   `opt:"h" help:"show help information"`
+
+	Doc      string `opt:"?"`
+	FileName string `opt:"1" help:"configuration file"`
+}{}
+
+if err := opt.Unmarshal(&args); err != nil {
+	log.Fatalf("%v\nRun ./app -h for help ", err)
+}
+```
+
+- `./app --verbose` - error: invalid argument --verbose;
+- `./app --port=hello` - error: 'hello' is incorrect value;
+- `./app --h yes` - error: 'yes' has incorrect type, bool expected.
 
 ## Usage
 
