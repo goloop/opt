@@ -1,7 +1,6 @@
 package opt
 
 import (
-	"errors"
 	"fmt"
 	"math"
 	"net/url"
@@ -10,155 +9,160 @@ import (
 	"strings"
 )
 
-// unmarshalOPT gets variables from the argument-line and sets them
-// into object by pointer. Returns an error if something went wrong.
+// unmarshalOpt parses variables from the command-line and sets them into
+// fields of object.
 //
-// unmarshalOPT method supports the following field's types: int, int8, int16,
+// Returns an error if it is impossible to parse the command line, for example:
+// there are an arg not provided in the go-structure; several values will be
+// passed for a field that is not a slice or array; etc.
+//
+// Generates panic if the structure has fields of the wrong type, for example:
+// field with the "?" key is not a string; the field with the "[]" key is not
+// a slice or array; the object is not a pointer; for unsupported field types
+// like: chan, map, etc..
+//
+// unmarshalOpt method supports the following field's types: int, int8, int16,
 // int32, int64, uin, uint8, uin16, uint32, in64, float32, float64, string,
 // bool, url.URL and pointers, array or slice from thous types (i.e. *int, ...,
 // []int, ..., []bool, ..., [2]*url.URL, etc.).
-//
-// For other filed's types (like chan, map ...) will be returned an error.
-func unmarshalOPT(obj interface{}, args []string) error {
-	var rt, rv = reflect.TypeOf(obj), reflect.ValueOf(obj)
-
-	// The obj argument should be a pointer to initialized object.
-	if obj == nil ||
-		rt.Kind() != reflect.Ptr || // check for pointer first ...
-		rt.Elem().Kind() != reflect.Struct || // ... and after on the struct
-		!rv.Elem().IsValid() {
-		return errors.New("cannot unmarshal command-line arguments " +
-			"into not *struct type")
-	}
-
-	// Walk through all the fields of the structure and read all tags.
-	sops := ""
-	fields := []*fieldSample{}
-	elem := rv.Elem()
-	for i := 0; i < elem.NumField(); i++ {
-		field := rt.Elem().Field(i)
-		ts := getTagSample(field.Tag.Get("opt"), field.Name)
-		item := elem.FieldByName(field.Name)
-		fields = append(fields, &fieldSample{ts, &item})
-
-		if ts.Short != "" {
-			sops += ts.Short
-		}
+func unmarshalOpt(obj interface{}, args []string) error {
+	// Analyze the structure and return a list of molds
+	// of each field: field name, tag group and field pointer.
+	//
+	// If it's returns an error - be critical!
+	// This is a problem with an incorrect structure and we need to
+	// stop the program until the developer fixes this error.
+	fcl, err := getFieldCastList(obj)
+	if err != nil {
+		// Convert this error to panic because it's a problem of
+		// structure's fields (it's developer's problem).
+		panic(err)
 	}
 
 	// Parse options.
-	opts, err := getOptions(args, sops)
-	if err != nil {
+	am := argMap{}
+	if err := am.parse(args, fcl.flags()); err != nil {
 		return err
 	}
 
-	for _, f := range fields {
-		if f.TagSample.Short == "?" {
+	// Insert values into the fields of the structure
+	// from the command line arguments.
+	for _, fc := range fcl {
+		var err error
+
+		if fc.tagGroup.shortFlag == "?" {
 			// Generate help info.
-			help := getHelp(rv, fields, opts)
-			f.Item.Set(reflect.ValueOf(help))
+			// The field must be of the string type, see in
+			// the getFieldCastList function.
+			help := getHelp(fcl, am)
+			fc.item.Set(reflect.ValueOf(help))
 			continue
 		}
 
-		// Update value.
-		err := updateByTag(f, opts)
-		if err != nil {
-			return err
-		}
-	}
+		// Contains a couple of arguments like: U, users, U or/and users -
+		// where U and users is synonyms.
+		arg := fmt.Sprintf(
+			"%s tmp/and %s",
+			fc.tagGroup.shortFlag,
+			fc.tagGroup.longFlag,
+		)
+		arg = strings.Trim(arg, " or/and ")
 
-	return nil
-}
+		value, kind := []string{}, fc.item.Kind()
+		switch f := fc.tagGroup.shortFlag; {
+		case f == "[]":
+			// Get positional arguments.
+			value = am.posValues()
+		default:
+			// Get the values of the argument.
+			value = am.flagValue(
+				fc.tagGroup.shortFlag,
+				fc.tagGroup.longFlag,
+				fc.tagGroup.defValue,
+				fc.tagGroup.sepList,
+			)
 
-// The updateByTag updates the data for
-// the field (access to the field via a tag).
-func updateByTag(field *fieldSample, opts optSamples) error {
-	var (
-		sep   = ","
-		seq   = []string{}
-		value = field.TagSample.Value
-		kind  = field.Item.Kind()
-	)
-
-	kindIsString := kind == reflect.String
-	kindIsSequence := kind == reflect.Array || kind == reflect.Slice
-	if field.TagSample.Short == "?" && !kindIsString {
-		return errors.New("container for help data must be string type")
-	} else if field.TagSample.Short == "[]" && !kindIsSequence {
-		return fmt.Errorf("the container for positional arguments "+
-			"must be a slice or an array but not %v", kind)
-	}
-
-	if field.TagSample.Short == "[]" {
-		value = ""
-		seq = opts.PositionalValues()
-	} else if v, ok := opts[field.TagSample.Short]; ok {
-		value = v // by short option name
-	} else if v, ok := opts[field.TagSample.Long]; ok {
-		value = v // by long option name
-	}
-
-	// Set values of the desired type.
-	switch kind {
-	case reflect.Array:
-		if len(seq) == 0 {
-			seq = strings.Split(value, sep)
-		}
-
-		if max := field.Item.Type().Len(); len(seq) > max {
-			kind := field.Item.Index(0).Kind()
-			return fmt.Errorf("%d items overflow [%d]%v array",
-				len(seq), max, kind)
-		}
-
-		err := setSequence(field.Item, seq)
-		if err != nil {
-			return err
-		}
-	case reflect.Slice:
-		if len(seq) == 0 {
-			seq = strings.Split(value, sep)
-		}
-
-		tmp := reflect.MakeSlice(field.Item.Type(), len(seq), len(seq))
-		err := setSequence(&tmp, seq)
-		if err != nil {
-			return err
-		}
-		field.Item.Set(reflect.AppendSlice(*field.Item, tmp))
-	case reflect.Ptr:
-		k, t := field.Item.Type().Elem().Kind(), field.Item.Type()
-		if k == reflect.Struct && t != reflect.TypeOf((*url.URL)(nil)) {
-			return fmt.Errorf("%s field has invalid type",
-				field.Item.Type().Name())
-		}
-
-		if k != reflect.Struct {
-			// If the pointer is not to a structure.
-			tmp := reflect.Indirect(*field.Item)
-			err := setValue(tmp, value)
-			if err != nil {
-				return err
-			}
-		} else {
-			// If a pointer to a structure of the url.URL.
-			err := setValue(*field.Item, value)
-			if err != nil {
-				return err
+			// The user in the command line tries to pass arguments as
+			// list to a field that doesn't have the slice or array type.
+			if len(value) > 1 {
+				if kind != reflect.Array && kind != reflect.Slice {
+					// In this situation, we need to take the
+					// last value in the list.
+					//
+					// return fmt.Errorf("%s used more than once", arg)
+					value = []string{value[len(value)-1]}
+				}
 			}
 		}
-	case reflect.Struct:
-		if field.Item.Type() != reflect.TypeOf(url.URL{}) {
-			return fmt.Errorf("%s field has invalid type",
-				field.Item.Type().Name())
+
+		// Set values of the desired type.
+		switch kind {
+		case reflect.Array:
+			// If a separator is specified, the elements must be separated.
+			var result []string
+
+			if sep := fc.tagGroup.sepList; sep != "" {
+				for _, item := range value {
+					tmp := strings.Split(item, sep)
+					result = append(result, tmp...)
+				}
+			} else {
+				result = value
+			}
+
+			if max := fc.item.Type().Len(); len(result) > max {
+				// Array overflow.
+				// -> "%d items overflow [%d]%v array", len(result), max, kind,
+				// kind := fs.item.Index(0).Kind()
+				return fmt.Errorf(
+					"maximum number of values for %s argument "+
+						"is %d but passed %d values",
+					arg, max, len(result),
+				)
+			}
+
+			err = setSequence(fc.item, result)
+		case reflect.Slice:
+			// Be sure to set Len equal Cap and more than zero.
+			// The slice must have at least one element to determine
+			// the type of the one.
+			// If a separator is specified, the elements must be separated.
+			var result []string
+
+			if sep := fc.tagGroup.sepList; sep != "" {
+				for _, item := range value {
+					tmp := strings.Split(item, sep)
+					result = append(result, tmp...)
+				}
+			} else {
+				result = value
+			}
+
+			if len(result) != 0 {
+				size := len(result)
+				tmp := reflect.MakeSlice(fc.item.Type(), size, size)
+				err = setSequence(&tmp, result)
+				if err == nil {
+					fc.item.Set(reflect.AppendSlice(*fc.item, tmp))
+				}
+			}
+		case reflect.Ptr:
+			if fc.item.Type().Elem().Kind() != reflect.Struct {
+				// If the pointer is not to a structure.
+				tmp := reflect.Indirect(*fc.item)
+				err = setValue(tmp, value[len(value)-1])
+			} else {
+				// If a pointer to a structure of the url.URL.
+				err = setValue(*fc.item, value[len(value)-1])
+			}
+		case reflect.Struct:
+			// Structure of the url.URL.
+			err = setValue(*fc.item, value[len(value)-1])
+		default:
+			// Set any type.
+			err = setValue(*fc.item, value[len(value)-1])
 		}
 
-		err := setValue(*field.Item, value) // if a url.URL structure
-		if err != nil {
-			return err
-		}
-	default:
-		err := setValue(*field.Item, value)
 		if err != nil {
 			return err
 		}
@@ -169,22 +173,14 @@ func updateByTag(field *fieldSample, opts optSamples) error {
 
 // The setSequence sets slice into item.
 func setSequence(item *reflect.Value, seq []string) (err error) {
-	var kind = item.Index(0).Kind()
+	// defer func() {
+	// 	// Catch the panic and return an exception as a value.
+	// 	if r := recover(); r != nil {
+	// 		err = fmt.Errorf("%v", r)
+	// 	}
+	// }()
 
-	defer func() {
-		// Catch the panic and return an exception as a value.
-		if r := recover(); r != nil {
-			err = fmt.Errorf("%v", r)
-		}
-	}()
-
-	// Ignore empty containers.
-	switch {
-	case kind == reflect.Array && item.Type().Len() == 0:
-		fallthrough
-	case kind == reflect.Slice && item.Len() == 0:
-		fallthrough
-	case len(seq) == 0:
+	if item.Len() != len(seq) {
 		return nil
 	}
 
@@ -200,9 +196,17 @@ func setSequence(item *reflect.Value, seq []string) (err error) {
 	return nil
 }
 
-// The setValue sets value into item.
-func setValue(item reflect.Value, value string) error {
+// The setValue sets value into field.
+func setValue(item reflect.Value, value string) (err error) {
+	defer func() {
+		// Catch the panic and return an exception as a value.
+		if r := recover(); r != nil {
+			err = fmt.Errorf("%v", r)
+		}
+	}()
+
 	var kind = item.Kind()
+
 	switch kind {
 	case reflect.Int, reflect.Int8, reflect.Int16,
 		reflect.Int32, reflect.Int64:
@@ -233,9 +237,10 @@ func setValue(item reflect.Value, value string) error {
 	case reflect.String:
 		item.SetString(value)
 	case reflect.Ptr:
-		if item.Type() != reflect.TypeOf((*url.URL)(nil)) {
-			return fmt.Errorf("%s field has invalid type", item.Type().Name())
-		}
+		// // Will not be allowed by the getFieldCast method.
+		// if item.Type() != reflect.TypeOf((*url.URL)(nil)) {
+		// 	return fmt.Errorf("%s field has invalid type", item.Type().Name())
+		// }
 
 		// The url.URL struct only.
 		u, err := url.Parse(value)
@@ -245,9 +250,10 @@ func setValue(item reflect.Value, value string) error {
 
 		item.Set(reflect.ValueOf(u))
 	case reflect.Struct:
-		if item.Type() != reflect.TypeOf(url.URL{}) {
-			return fmt.Errorf("%s field has invalid type", item.Type().Name())
-		}
+		// // Will not be allowed by the getFieldCast method.
+		// if item.Type() != reflect.TypeOf(url.URL{}) {
+		// 	return fmt.Errorf("%s field has invalid type", item.Type().Name())
+		// }
 
 		// The url.URL struct only.
 		u, err := url.Parse(value)
@@ -263,7 +269,7 @@ func setValue(item reflect.Value, value string) error {
 	return nil
 }
 
-// strToIntKind convert string to int64 type with checking for conversion
+// The strToIntKind convert string to int64 type with checking for conversion
 // to intX type. Returns default value for int type if value is empty.
 //
 // P.s. The intX determined by reflect.Kind.
@@ -276,15 +282,17 @@ func strToIntKind(value string, kind reflect.Kind) (r int64, err error) {
 	// Convert string to int64.
 	r, err = strconv.ParseInt(value, 10, 64)
 	if err != nil {
-		return 0, err
+		return 0, fmt.Errorf("'%v' is incorrect value", value)
 	}
 
 	switch kind {
 	case reflect.Int:
-		// For 32-bit platform it is necessary to check overflow.
+		// If there was no exception during the conversion,
+		// then we have exactly the number in the uint64 range, but
+		// for 32-bit platform it is necessary to check overflow.
 		if strconv.IntSize == 32 {
 			if r < math.MinInt32 || r > math.MaxInt32 {
-				return 0, fmt.Errorf("%d overflows int (int32)", r)
+				return 0, fmt.Errorf("%d overflows int32", r)
 			}
 		}
 	case reflect.Int8:
@@ -300,7 +308,8 @@ func strToIntKind(value string, kind reflect.Kind) (r int64, err error) {
 			return 0, fmt.Errorf("%d overflows int32", r)
 		}
 	case reflect.Int64:
-		// pass
+		// If there was no exception during the conversion,
+		// then we have exactly the number in the int64 range.
 	default:
 		r, err = 0, fmt.Errorf("incorrect kind %v", kind)
 	}
@@ -321,14 +330,19 @@ func strToUintKind(value string, kind reflect.Kind) (r uint64, err error) {
 	// Convert string to uint64.
 	r, err = strconv.ParseUint(value, 10, 64)
 	if err != nil {
-		return 0, err
+		return 0, fmt.Errorf(
+			"'%v' has incorrect type, positive number expected",
+			value,
+		)
 	}
 
 	switch kind {
 	case reflect.Uint:
-		// For 32-bit platform it is necessary to check overflow.
+		// If there was no exception during the conversion,
+		// then we have exactly the number in the uint64 range, but
+		// for 32-bit platform it is necessary to check overflow.
 		if strconv.IntSize == 32 && r > math.MaxUint32 {
-			return 0, fmt.Errorf("%d overflows uint (uint32)", r)
+			return 0, fmt.Errorf("%d overflows uint32", r)
 		}
 	case reflect.Uint8:
 		if r > math.MaxUint8 {
@@ -343,7 +357,8 @@ func strToUintKind(value string, kind reflect.Kind) (r uint64, err error) {
 			return 0, fmt.Errorf("strToUint32: %d overflows uint32", r)
 		}
 	case reflect.Uint64:
-		// pass
+		// If there was no exception during the conversion,
+		// then we have exactly the number in the uint64 range.
 	default:
 		r, err = 0, fmt.Errorf("incorrect kind %v", kind)
 	}
@@ -364,7 +379,10 @@ func strToFloatKind(value string, kind reflect.Kind) (r float64, err error) {
 	// Convert string to Float64.
 	r, err = strconv.ParseFloat(value, 64)
 	if err != nil {
-		return 0.0, err
+		return 0.0, fmt.Errorf(
+			"'%v' has incorrect type, number expected",
+			value,
+		)
 	}
 
 	switch kind {
@@ -373,7 +391,8 @@ func strToFloatKind(value string, kind reflect.Kind) (r float64, err error) {
 			return 0.0, fmt.Errorf("%f overflows float32", r)
 		}
 	case reflect.Float64:
-		// pass
+		// If there was no exception during the conversion,
+		// then we have exactly the number in the float64 range.
 	default:
 		r, err = 0, fmt.Errorf("incorrect kind")
 	}
@@ -395,7 +414,10 @@ func strToBool(value string) (bool, error) {
 	if errB != nil {
 		f, errF := strconv.ParseFloat(value, 64)
 		if errF != nil {
-			return r, errB
+			return r, fmt.Errorf(
+				"'%v' has incorrect type, bool expected",
+				value,
+			)
 		}
 
 		if math.Abs(f) > epsilon {

@@ -4,11 +4,11 @@
 [![Go Report Card](https://goreportcard.com/badge/github.com/goloop/opt)](https://goreportcard.com/report/github.com/goloop/opt) [![License](https://img.shields.io/badge/license-BSD-blue)](https://github.com/goloop/opt/blob/master/LICENSE) [![License](https://img.shields.io/badge/godoc-YES-green)](https://godoc.org/github.com/goloop/opt)
 
 
-*Version: 0.1.4*
+*Version: v1.0.0*
 
 # opt
 
-The opt module implements methods for manage arguments of the command-line.
+Package opt implements methods for manage arguments of the command-line.
 
 ## Installation
 
@@ -22,333 +22,374 @@ To use this package import it as:
 
     import "github.com/goloop/opt"
 
-### Tag format
+## Quick start
 
-Structure fields may have a opt tag as `opt:"short[,long[,value[,help]]]"`
-where:
+The module supports parsing of different types of data, positional arguments, arguments passed on short and long flags. It can be any combination of command line arguments. For examples:
 
-    short - short name of the option (one char from the A-Za-z);
-    long - long name of the option (at least two characters);
-    value - default value;
-    help - help information.
+```shell
+./app -H 0.0.0.0 --port=80 --no-verbose -U goloop.one -dc a.yaml,b.yaml 5 10 15
+./app 5 --host 0.0.0.0 -p 80 --verbose false -U goloop.one -c a.yaml -c b.yaml -d -- 10 15
+./app 5 10 -c a.yaml -p 80 --host=0.0.0.0 --no-verbose -dU goloop.one -c b.yaml 15
+./app 5 10 15 -c a.yaml,b.yaml -p 80 --host=0.0.0.0 --no-verbose -dU goloop.one
+./app 5 10 15 -c a.yaml,b.yaml -p 80 -H 0.0.0.0 --verbose=false -d true -U goloop.one
+./app -c a.yaml,b.yaml -p 80 -H 0.0.0.0 --no-verbose -dU goloop.one 5 10 15
+./app 5 --verbose=false -c a.yaml -c b.yaml -p 80 -H 0.0.0.0 -dU goloop.one 10 15
+```
 
-### Quick start
+Example of use:
 
-Command-line options are stored in a Go-struct, like this, for example:
+```go
+package main
 
-    import "path/filepath"
+import (
+	"fmt"
+	"log"
+	"net/url"
+	"os"
 
-    // Args is structure for parsing os.Args data.
-    type Args struct {
-        Help     bool     `opt:"h,help,,show this help"`
-        Verbose  bool     `opt:"v,verbose,true,verbose mode (default true)"`
-        Debug    bool     `opt:"d,debug,,debug mode"`
-        Users    []string `opt:"U,users,{John,Bob,Robert},user list"`
-        Greeting string   `opt:"g,,'Howdy!',greeting message"`
+	"github.com/goloop/opt"
+)
 
-        // Special variable that contains whole documentation string has
-        // short option name `?`. This variable will be filled automatically
-        // after parsing the command-line.
-        Doc string `opt:"?"`
+// Args is command-line argument object.
+type Args struct {
+	Host string `opt:"H" alt:"host" def:"localhost" help:"host of the server"`
+	Port int    `opt:"port" alt:"p" def:"8080" help:"port of the server"`
+	Help bool   `opt:"h" alt:"help" help:"show application usage information"`
 
-        // To save the path to the app use short option name as `0` (zero).
-        Path string `opt:"0,,,path to app"` // short name as: '0'
+	Debug   bool     `opt:"d" help:"debug mode"`
+	Verbose bool     `def:"true" help:"enable verbose mode"` // --verbose
+	Configs []string `opt:"c" sep:","`
 
-        // Positional arguments can be stored in a slice or array.
-        // Note: use either an array or a slice but not both at once
-        // at the same time. Set short option name as `[]`.
-        // ABC [3]int `opt:"[]"` // short name as: '[]'
-        ABC []int `opt:"[]"` // short name as: '[]'
+	ServerURL url.URL `opt:"U" help:"URL to the server"`
 
-        // Distribute positional arguments to fields, use short
-        // option name as: 1,2.. N.
-        A int `opt:"1"` // 1st positional argument
-        B int `opt:"2"` // 2nd positional argument
-        C int `opt:"3"` // 3rd positional argument
-    }
+	Doc        string `opt:"?"`
+	Positional []int  `opt:"[]"`
+}
 
-    // HelpOPT adds general help information about app.
-    func (a *Args) HelpOPT(path string) string {
-        _, name := filepath.Split(path)
-        return name + "is test application for testing opt package features."
-    }
+func main() {
+	var args Args
 
-    // UsageOPT formats information about using command line parameters.
-    func (a *Args) UsageOPT(path string) string {
-        _, name := filepath.Split(path)
-        return "Usage: " + name + " --host, --port[,--config] "
-    }
+	if err := opt.Unmarshal(&args); err != nil {
+		log.Fatal(err)
+	}
 
-To import opt package use: `import "github.com/goloop/opt"`
+	if args.Help {
+		fmt.Println(args.Doc)
+		os.Exit(0)
+	}
 
-Use the Unmarshal method to parse os.Args and save it intp Go-struct, like:
+	fmt.Println("Host:", args.Host)
+	fmt.Println("Port:", args.Port)
+	fmt.Println("Help:", args.Help)
+	fmt.Println("Debug:", args.Debug)
+	fmt.Println("Verbose:", args.Verbose)
+	fmt.Println("Configs:", args.Configs)
+	fmt.Println("Server URL:", args.ServerURL.String())
+	fmt.Println("Positional:", args.Positional)
 
-    var args = Args{}
-    err := opt.Unmarshal(&args) // pass a pointer to the struct
-    if err != nil {
-        log.Fatal(err)
-    }
+	// Output:
+	//  Host: 0.0.0.0
+	//  Port: 80
+	//  Help: false
+	//  Debug: true
+	//  Verbose: false
+	//  Configs: [a.yaml b.yaml]
+	//  Server URL: goloop.one
+	//  Positional: [5 10 15]
+}
 
-Now the application can be launched by any of the following methods (all call
-options are equivalent for `opt` parser):
+```
 
-    ./app -dU Jack,Harry --no-verbose -g "Hello, world" 5 10 15
-    ./app -d -U Jack,Harry --no-verbose -g "Hello, world" -- 5 10 15
-    ./app -dU Jack,Harry --verbose false -g "Hello, world" 5 10 15
-    ./app --no-verbose true -dU Jack,Harry -g "Hello, world" 5 10 15
-    ./app -dUJack,Harry --verbose=false -g"Hello, world" 5 10 15
-    ./app 5 10 15 -dUJack,Harry --verbose false -g"Hello, world"
-    ./app 5 10 15 -UJack,Harry --verbose false -g"Hello, world" -d true
-    ./app 5 -UJack,Harry --verbose false -g"Hello, world" -d -- 10 15
+Show help on using command line arguments.
 
-For this example, after parsing, the data will be as follows:
+```shell
+./app -h
+```
 
-    // args.Help == false
-    // args.Verbose == false
-    // args.Debug == true
-    // args.Users == []string{"Jack", "Harry"}
-    // args.Greeting) == "Hello, world"
+Result:
 
-    // args.Path == "./main"
+```shell
+Options:
+    -H, --host    host of the server;
+    -d            debug mode;
+    -h, --help    show application usage information;
+    -p, --port    port of the server;
+        --verbose enable verbose mode;
+    -U            URL to the server.
 
-    // args.ABC == []int{5, 10, 15}
-
-    // args.A == 5
-    // args.B == 10
-    // args.C == 15
-
-The opt package provides the ability to auto-generate help. In this example, the
-`Doc` field is a container for storing auto-generate help data:
-
-    // Show help information.
-    if args.Help {
-        fmt.Println(args.Doc)
-        return
-    }
-
-After calling the application as `./main -h`, help information will be
-displayed:
-
-    Test application for testing opt package features.
-
-    Usage: ./main [-h] [-v] [-d] [-U value] [-g value] -- a1, ..., a3
-        -h,--help      show this help
-        -v,--verbose   verbose mode (default true)
-        -d,--debug     debug mode
-        -U,--users     user list
-        -g             greeting message
-        a1, ..., a3    positional arguments
-
-The struct that implements the `opt.Helper` interface that allows you to add
-arbitrary information to automatically generated help data.
-
-## Flag rules
-
-### Named options
-
-The opt is flag identifier and the flag has a structure as
-`[short[,long[,value[,help]]]]` where is:
-
-    short  short option name, like: `-p`, `-h`, `-d`, `-U`;
-    long   long option name, like: `--port`, `--help`, `--debug`;
-    value  default value;
-    help   argument summary.
-
-At least one option identifier must be specified, short or long or both at once.
-
-Arguments may be skipped or set to underscore as: `,port,8080` equal to
-`_,port,8080,_` or `p,,,port number` equal to `p,_,_,port number`.
-
-### Examples
-
-    type Args struct {
-        Help bool   `opt:"h,help,,show help"` // default 'false' for bool type
-        Host string `opt:"_,host,localhost,host addr"`
-        Port int    `opt:"p,port,8080,port number"`
-    }
-
-#### Short name
-
-Only one character long in the range `A-Za-z`.
-
-#### Long name
-
-From two or more characters in a range `a-z`
-
-#### Value
-
-Literal of the appropriate type. To specify a complex default value like string
-with `,` symbol, or sequence of values - escape the expression accordingly:
-
-    OpenPorts []int  `opt:",op,{80,8080,8383},list of open ports"`
-    Greeting  string `opt:"g,,'Hello, world',greeting message"`
-    Parting   string `opt:"p,,\"Oh, bye\",greeting message"`
-
-#### Help
-
-Help line for argument. The string length is not limited. If the length of the
-help line and the left part (option name) are longer than 79 characters, the
-help will be cut into small pieces and formatted correctly.
-
-// Args structure for parsing os.Args using opt package.
-
-    type Args struct {
-        // ...
-        Verbose  bool `opt:"v,verbose,true,verbose mode (default true) you can use --no-verbose or --verbose=false to deactivate it."`
-        // ...
-    }
-
-Format result
-
-    ...
-    -v,--verbose   verbose mode (default true) you can use --no-verbose or
-                   --verbose=false to deactivate it.
-    ...
-
-### Positional options and path to the executable
-
-To set the positional option needed to specify an order index of it as a short
-option name. The long option name is ignored. Zero index always indicates to the
-executable path.
-
-    type Args struct {
-        Help bool   `opt:"h,help,,show help"`
-        Path string `opt:"0"` // executable path
-        Host string `opt:"1,,,host addr"`
-        Port int    `opt:"2,,80,port number"`
-    }
-
-It looks like: `./main localhost 8080` after `Host` contains `localhost` and
-`Port` - `8080`. Named positional arguments are not required, so `./main
-localhost` is correct construction (port is default value: 80).
-
-An array or slice can be used to indicate a list of a specific/indefinite length
-of the same type of positional arguments. The list contains positional arguments
-from 1 index (i.e. ignoring executable path). As short option name the `[]`
-marker must be set.
-
-    type Args struct {
-        Path   string  `opt:"0"` // executable path
-        Values []int   `opt:"[]"`
-    }
-
-It looks like: `./main 1 2 3 4 5 6 7` after `Values` contains
-`[]int{1,2,3,4,5,6,7}`. Positional arguments are optional.
-
-When using an array as container for positional options, there may be an
-overflow error:
-
-    type Args struct {
-        Values [3]string `opt:"[]"`
-    }
-
-And `./main one two three four` make an overflow error.
-
-### Help container
-
-Documentation is automatically generated during unmarshalling. In order to
-designate the field for help data set `?` as the short name. The field must be
-of string type. The remaining positions (long, value, help) will be ignored by
-the parser:
-
-    type Args struct {
-        HelpData string `opt:"?"`
-    }
+Positional arguments:
+The app takes an unlimited number of positional arguments.
+```
 
 ## Rules of the parsing
 
-### Long option
+### Command-line arguments
 
-It self-documenting option like: `--host`, `--user-name`, `--debug`. There are
-two dashes in front of the name and the name can use one or more dashes to
-separate words. This option case not sensitive, so `--user-name`, `--User-Name`,
-`--USER-NAME` these are the same names.
+Command-line arguments are a way to provide the additional parameters to the GoLang application in the process of launching. GoLang has an os package that contains a slice called as Args, this one is an array of string that contains all the command line arguments passed.
 
-After prefix from two dashes there should be no spaces:
+For example: `./app -Vp80 --host=127.0.0.1 --user goloop` which will be presented in os.Args as: `[]string{"./app", "-Vp80", "--host=127.0.0.1", "--user", "goloop"}`.
 
-    `--debug`  correct;
-    `-- debug` incorrect for long option, it's like positional argument.
+There are various discussions on how to name certain items in command-line: flags, values, options, parameters, switches, etc. In this package we use the following terminology: command-line arguments can be divided into two categories - flags and values.
 
-If option has value it must be written after the equal sign (`=`) or after the
-space, like: `--host=localhost` or `--host localhost`. Multi-word meaning must
-be enclosed in double quotes, like: `--user-name="John Smith"` or `--user-name
-"John Smith"`. The switcher can be specified without value: `--debug` or
-`--debug=true` or `--debug true` for args configurations:
+Flags are instructions that allow to change the behavior of the program. Flags can be divided into long and short, with values or as switches.
 
-    type Args struct {
-        Debug bool `opt:",debug"` // default false for bool type
-    }
+Values are data that will be set as additional program parameters. Values can be passed as position arguments or through a flag (for flags with values).
 
-For boolean values in a long option the prefix `no-` can be specified to
-indicate `false`: `--debug` equal to `--debug=true`, `--no-debug` equal to
-`--debug=false`. This is also valid for specifying the default value as:
+Thus, in the example above: `./app` is a positional value (program name, this argument is automatically added by GoLang to the argument list); `-Vp80` is a group of two short flags `-V` and `-p` where the latter has a value of `80`; `--host=127.0.0.1` is a long flag `--host` that has a value of `127.0.0.1` etc.
 
-    type Args struct {
-        Debug bool `opt:",debug,true"` // default value sets as true
-    }
+### Long flags
 
-### Short option
+A long flag requires two dashes before the argument name, for example: `--host`, `--debug`, `--verbose`. The name of the flag must consist of latin letters and numbers. Also to separate the words of the argument name can be used dash, for example: `--user-name`.
 
-The abbreviation for long option is indicated as one character having one dash
-character in front of the name, like: `-h`, `-U`, `-d`. This option case
-sensitive, so `-u` and `-U` it's different names. Latin characters only:
-`A-Za-z`.
+The long flag name is not case sensitive, ie. `--host`, `--HOST` and `--Host` it is the same names.
 
-After prefix from one dashes there should be no spaces:
+After prefix from two dashes there should be no spaces, for example `--host` is correct flag but `-- host` is incorrect flag identifier (two dashes `--` are used to separate a group of position values from a group of flags, see below).
 
-    `-d` - correct;
-    `- d` - incorrect.
+If flag has value it must be written after the equal sign `=` or after the space, for example: `--host=localhost` and `--host localhost` the same. Value from a few words separated by a space should be enclosed in quotation marks, for example: `--user="Smith J."` or `--user "Smith J."`.
 
-If option has value it must be written after the space character, like: `-h
-localhost`. Multi-word meaning must be enclosed in double quotes, like: `-U
-"John Smith"`.
+The flag can be used as a sweater, in this case, it is assumed that its absence in the command line this flag contains a false value (but it is not required, and depends on the default value specified in the program). The switch can be prefixed `no-`, which sets the value to false.
 
-The values as numbers can be written without a space, i.e `-p8080` equal to `-p
-8080`.
+For example, for `--verbose` flag: `--verbose true` and `--verbose` the same; `--verbose false` and `--no-verbose` the same too.
 
-The string value can also be written without a space if the first character of
-the value not expected short option:
+The sequence of flags does not create problems, so the following arguments will give the same result:
 
-    type Args struct {
-        Host  string `opt:",host,0.0.0.0"`
-        Port  int    `opt:"p,port,8080"`
-        Debug int    `opt:"d"`
-    }
+```
+./app -dUJack -U Bob --user=Roy --no-verbose -g"L R" 5 10 15
+./app -dU Jack -U Bob --USER=Roy --No-Verbose -g "L R" 5 10 15
+./app -d -UJack -U Bob -URoy --no-verbose -g"L R" 5 10 15
+./app -g "L R" -U Jack -UBob -URoy --no-verbose -d -- 5 10 15
+./app 5 -dU Jack --user Bob -URoy --verbose false -g"L R" 10 15
+./app 5 10 --no-verboSe -dU Jack -U Bob -U Roy -g "L R" 15
+./app 5 10 15 -UJack -UBob -URoy --verbose=false -g "L R" -d
+./app 5 10 15 -U Jack -UBob -URoy -d --VERBOSE false -g"L R"
+./app 5 -UJack --no-verbose -g"L R" -UBob -d true -URoy 10 15
+./app 5 -UJack -UBob --verbose false -URoy -g"L R" -d -- 10 15
+```
 
--- short options registered: `-p` and `-d`, but options like `-t` and`-f` isn't
-registered therefore an expression like: `-dtrue` equal to `-d true`, or
-`-dfalse` equal to `-d false`. But option like: `-dpass` will be parsed as `-d
--p ass` because there is a registered `-p` option.
+### Short flags
 
-Short options can be grouped: `-d -i -Z` equal to `-diZ`. In the group, the
-value can be specified only for the last option: `-diZp8080` or `-diZp 8080`
-equal to `-diZ -p 8080`.
+A short flag requires one dash before the argument name, for example: `-h`, `-d`, `-v`. The name of the flag must consist of latin letters only.
+
+The flag name is case sensitive, ie. `-h` and `-H` are different flags.
+
+After prefix from one dash there should be no spaces, for example `-h` is correct flag but `- h` is incorrect flag identifier.
+
+If flag has value it must be written after the space or without separating the value from the flag, for example: `-p 8080` and `-p8080` the same. Value from a few words separated by a space should be enclosed in quotation marks, for example: `-u "Smith J."` or `-u"Smith J."`.
+
+The flag can be used as a sweater, in this case, it is assumed that its absence in the command line this flag contains a false value.
+
+For example, for `-v` flag: `-v true` and `-v` the same; `-v false` to set the value to false.
+
+Short flags can be grouped. For example for flags `-v`,` -d`, `-p` where the latter has the value` 8080` can be written as `-vdp8080` or` -dvp 8080` or `-vd -p 8080` or` -vp8080 - etc.
+
+Pay attention to duplication of short flags in one group, for example: `-vpv` or `-vvp`, where second `v` is duplicated. In this case, its second iteration will be considered as value for the previous flag, ie `-vpv` equivalent `-v -p v` where `-p` gets the value `v`, and `-vvp` equivalent for `-v vp` where `-v` gets the value vp.
 
 ### Positional arguments
 
-Zero positional argument is the full path to the program being launched. This
-value is set automatically.
+Positional arguments are arguments that do not relate to the value of a flag.
 
-Starting with the first argument without prefixes `--` and `-` the positional
-arguments are specified are divided with space or can be set at the end of a
-line after a double blank `--` values: `positional arguments [options[[--]
-positional arguments]]`. For examples:
+Positional arguments start on the left and follow the first short or long flag. For example: `./app 5 10 15 -p8080`, where `./app`, `5`, `10`, `15` is a positional arguments.
 
-Double dashes can be ommited if positional argument has no prefix `--` or `-`
-and positional argument not located immediately after a boolean option with
-value by default.
+Zero positional argument is the full path to the program being launched. This value is set automatically.
 
-The `one two "three and four" -p8080 --debug` or `-p 8080 --debug -- one two
-"three and four"` or `one -p8080 --debug=true two "three and four"` equal to
-Go-map: `map[string]string{"1": "one", "2": "two", "3": "three and four", "-p":
-"8080", "--debug": "true"}`.
+Also, position arguments are written after the value to the last short or long flag. For example: `./app --host localhost 5 10 15` or `./app -p 8080 5 10 15` etc., where `localhost` it is value for `--host` flag and `8080` for `-p` flag, but `./app`, `5`, `10`, `15` is a positional arguments.
 
-For example
+If position arguments are written to the right and the last flag on the command line is a switcher (doesn't contain value, for example the boolean flag of debug), positional arguments must be written after a double dash. For example: `./app --host localhost --debug -- 5 10 15`. If you omit the double dash, argument `5` will be passed as a value to the `--debug` flag.
 
-    type Args struct {
-        Debug int `opt:"d,,,debug"` // boolean option
-        Pos []int `opt:"[]"`
-    }
+Thus, it is not the `-f` flag that is passed, but the positional argument (value) `-f`.
+
+Positional arguments can be written both left and right simultaneously. For example: `./app 5 10 --host localhost -d -- 15` and `./app 5 10 -d --host localhost 15` and `./app 5 --host localhost -d -- 10 15` etc,. the same.
+
+
+### Duplicate flags
+
+In the command line, flags that are processed as lists (slice/array) can be duplicated. For example, we need to pass a list of users, for which there is a short flag `-u` and a long flag` --user`, and in the program the list has the type `[] string`: `./app -uJohn --user=Bob -u Roy` will give a result as `[]string{"John", "Bob", "Roy"}`.
+
+Duplicate flags that are not declared in the program as a list (slice/array) don't cause an error. In this situation the value for the item will be taken from the last entry in the list.
+
+### Flags that are not declared
+
+If the flag is not declared in the program, but it is in the command line - this should cause an error, or display help information with available commands.
+
+## Tag structure
+
+You can use the following tags to configure command line parsing rules:
+
+- opt - short or long flag name;
+- alt - alternate flag name of opt value;
+- def - default field value;
+- spe - if the field is a list, indicates the delimiter of the list;
+- help - short description of the option.
+
+### opt
+
+Specifies the name of the short or long flag whose data must be entered in the appropriate field. If no tag is specified, it will be automatically set to the value of the field name converted to kebab-case. For example: `UserName` converts to `user-name`. 
+
+Has reserved values:
+
+- `-` - field to ignore;
+- `?` - field to save the generated help information;
+- `[]` - field to save the positional arguments;
+- `0`, `1`, ..., `N` where N is digit - the specific value of the position argument of the specified index (for index 0 the value is reserved - the full path of the application call).
+
+For example: `./app --host localhost --user-name Goloop 1 2 3`
+
+```go
+var args = struct {
+	Host       string `opt:"host"`
+	UserName   string // automatically `opt:"user-name"`
+	Ignored    int    `opt:"-"`
+	Positional []int  `opt:"[]"`
+}{}
+
+if err := opt.Unmarshal(&args); err != nil {
+	log.Fatal(err)
+}
+
+fmt.Println("Host:", args.Host)
+fmt.Println("UserName:", args.UserName)
+fmt.Println("Ignored:", args.Ignored)
+fmt.Println("Positional:", args.Positional)
+
+// Output:
+//  Host: localhost
+//  UserName: Goloop
+//  Ignored: 0
+//  Positional: [1 2 3]
+```
+
+### alt
+
+Sets the alternate flag name of opt value. For example, if opt has value of the long flag name, then alt can take the value of the short ensign and vice versa. The values of opt and alt cannot be either a long or a short flag name at the same time.
+
+```go
+var args = struct {
+	Host string `opt:"host" alt:"h"` // -h, --host
+	Port int    `opt:"p" alt:"port"` // -p, --port
+	// SimTwoShort string `opt:"s" alt:"t"`     // panic
+	// SimTwoLong  string `opt:"sim" alt:"two"` // panic
+}{}
+
+if err := opt.Unmarshal(&args); err != nil {
+	log.Fatal(err)
+}
+
+fmt.Println("Host:", args.Host)
+fmt.Println("Port:", args.Port)
+
+// Output:
+//  Host: localhost
+//  Port: 80
+```
+
+Can handle the following command line arguments:
+
+```shell
+./app -h localhost -p 80
+./app --host localhost -p 80
+./app -h localhost --port 80
+./app --host=localhost --port=80
+```
+
+### def
+
+Sets the default value of the field. To set a bool value are used `true` or `false`. To set a list value are used elements of the corresponding type separated by some separator are used. The delimiter type must be specified in the sep tag. For example: `./app`
+
+```go
+var args = struct {
+	Host     string   `opt:"h" def:"localhost"`
+	Port     int      `opt:"p" def:"8080"`
+	Verbose  bool     `opt:"v" def:"true"`
+	UserList []string `opt:"U" def:"John,Bob,Roy" sep:","`
+	AgeList  []int    `opt:"A" def:"23/25/27" sep:"/"`
+}{}
+
+if err := opt.Unmarshal(&args); err != nil {
+	log.Fatal(err)
+}
+
+fmt.Println("Host:", args.Host)
+fmt.Println("Port:", args.Port)
+fmt.Println("Verbose:", args.Verbose)
+fmt.Println("UserList:", args.UserList)
+fmt.Println("AgeList:", args.AgeList)
+
+// Output:
+//  Host: localhost
+//  Port: 8080
+//  Verbose: true
+//  UserList: [John Bob Roy]
+//  AgeList: [10 20 30]
+```
+
+To pass the list, you can use the flag for each new argument or write them through the separator specified in the sep tag.
+
+```sh
+./app -h localhost -UJohn -UBob,Roy
+./app -p8080 -A23 -A25 -A27
+./app -p 8080 -A23/25/27 -UJohn,Bob,Roy
+```
+
+### sep
+
+Specifies the symbol to divide the list into items. Relevant in list type fields only. By default is empty - forbids passing the list as one value (ie, you need to use a flag for each item, for example: `-A23 -A20 -A30` but it is impossible somehow so: `-A23,25,27`).
+
+Specifies the symbol to divide the list into items. Relevant in list type fields only. By default is empty - forbids passing the list as one value (ie, you need to use a flag for each item, for example: `-A23 -A20 -A30` but it is impossible somehow so: `-A23,25,27`). If a value is specified, this value is used to distribute the list in both the def thesis and the argument command line. For example: `./app -a23,25:27 -b23,25:27 -c23,25:27`.
+
+
+```go
+var args = struct {
+	ListA []string `opt:"a" sep:""`
+	ListB []string `opt:"b" sep:","`
+	ListC []string `opt:"c" sep:":"`
+}{}
+
+if err := opt.Unmarshal(&args); err != nil {
+	log.Fatal(err)
+}
+
+fmt.Println("ListA:", args.ListA, "len:", len(args.ListA))
+fmt.Println("ListB:", args.ListB, "len:", len(args.ListB))
+fmt.Println("ListC:", args.ListC, "len:", len(args.ListC))
+
+// Output:
+//  ListA: [23,25:27] len: 1
+//  ListB: [23 25:27] len: 2
+//  ListC: [23,25 27] len: 2
+```
+
+### help
+
+The tag is used to briefly describe the arguments of the command line. If the tag is empty - the argument isn't displayed in the auto-generated help information. For example: `./app -h`
+
+```go
+var args = struct {
+	Host string `opt:"host" alt:"H" help:"host of the server"`
+	Port int    `opt:"port" alt:"p" help:"port of the server"`
+	Help bool   `opt:"h" help:"show help information"`
+
+	Doc      string    `opt:"?"`
+	FileName string    `opt:"1" help:"configuration file"`
+}{}
+
+if err := opt.Unmarshal(&args); err != nil {
+	log.Fatal(err)
+}
+
+if args.Help {
+	fmt.Println(args.Doc)
+}
+
+// Output:
+//  Options:
+//      -H, --host host of the server;
+//      -h         show help information;
+//      -p, --port port of the server.
+//
+//  Positional arguments:
+//  The app takes an one of positional argument, including:
+//       1 configuration file.
+```
 
 ## Usage
 
@@ -356,23 +397,26 @@ For example
 
     func Unmarshal(obj interface{}) error
 
-Unmarshal to parses the argument-line options and stores the result in the value
-pointed to by obj. If the obj isn't pointer to struct or is nil - returns an
-error.
+Unmarshal parses the argument-line options and stores the result to go-struct.
+If the obj isn't a pointer to struct or is nil - returns an error.
 
 Unmarshal method supports the following field's types: int, int8, int16, int32,
 int64, uin, uint8, uin16, uint32, in64, float32, float64, string, bool, url.URL
 and pointers, array or slice from thous types (i.e. *int, ..., []int, ...,
-[]bool, ..., [2]*url.URL, etc.). For other filed's types (like chan, map ...)
-will be returned an error.
+[]bool, ..., [2]*url.URL, etc.).
 
-Structure fields may have a opt tag as `opt:"short[,long[,value[,help]]]"`
-where:
+For other filed's types (like chan, map ...) will be returned an error.
 
-    short - short name of the option (one char from the A-Za-z);
-    long - long name of the option (at least two characters);
-    value - default value;
-    help - help information.
+Use the following tags in the fields of structure to set the marshing
+parameters:
+
+    opt  indicates a short or long option;
+    alt  optional, alternative option for position opt,
+         if a long option is specified in opt, a short option
+         can be specified in alt or vice versa;
+    def  default value (if empty, sets the default value
+         for the field type of structure);
+    help brief help about the option.
 
 Suppose that the some values was set into argument-line as:
 
@@ -380,42 +424,27 @@ Suppose that the some values was set into argument-line as:
 
 Structure example:
 
-    // Config structure for containing values from the argument-line.
-    type Config struct {
-        Host string `opt:",host,localhost"`
-        Port int    `opt:"p,port,80,port number"`
-        Help bool   `opt:"h,help"`
+    // Args structure for containing values from the argument-line.
+    type Args struct {
+    	Host string `opt:"host" def:"localhost"`
+    	Port int    `opt:"p" alt:"port" def:"80" help:"port number"`
+    	Help bool   `opt:"h" alt:"help"`
     }
 
-Unmarshal data from the argument-line into Config struct.
+Unmarshal data from the argument-line into Args struct.
 
-    // Important: pointer to initialized structure!
-    var config = &Config{}
-
-    err := opt.Unmarshal(config)
-    if err != nil {
-        // something went wrong
+    var args Args
+    if err := opt.Unmarshal(&args); err != nil {
+    	log.Fatal(err)
     }
 
-    config.Host // "0.0.0.0"
-    config.Port // 8080
+    fmt.Printf("Host: %s\nPort: %d\n", args.Host, args.Port)
+    // Output:
+    //  Host: 0.0.0.0
+    //  Port: 8080
 
-#### type Helper
+#### func  Version
 
-    type Helper interface {
-    	HelpOPT(string) string
-    }
+    func Version() string
 
-
-Helper is the interface implemented by types that can returns help information
-about app.
-
-#### type Usager
-
-    type Usager interface {
-    	UsageOPT(string) string
-    }
-
-
-Usager is the interface implemented by types that can returns information about
-using command line parameters.
+Version returns the version of the module.
