@@ -25,7 +25,9 @@ import (
 // int32, int64, uin, uint8, uin16, uint32, in64, float32, float64, string,
 // bool, url.URL and pointers, array or slice from thous types (i.e. *int, ...,
 // []int, ..., []bool, ..., [2]*url.URL, etc.).
-func unmarshalOpt(obj interface{}, args []string) error {
+func unmarshalOpt(obj interface{}, args []string) []error {
+	var errs []error
+
 	// Analyze the structure and return a list of molds
 	// of each field: field name, tag group and field pointer.
 	//
@@ -42,14 +44,17 @@ func unmarshalOpt(obj interface{}, args []string) error {
 	// Parse options.
 	am := argMap{}
 	if err := am.parse(args, fcl.flags()); err != nil {
-		return err
+		errs = append(errs, err)
 	}
 
 	// Insert values into the fields of the structure
 	// from the command line arguments.
+	//
+	// Important: Do not interrupt the cycle on the first error:
+	//  - if there is a field for reference information,
+	//    it should be processed in any case;
+	//  - need to collect all possible errors.
 	for _, fc := range fcl {
-		var err error
-
 		if fc.tagGroup.shortFlag == "?" {
 			// Generate help info.
 			// The field must be of the string type, see in
@@ -114,11 +119,11 @@ func unmarshalOpt(obj interface{}, args []string) error {
 				// Array overflow.
 				// -> "%d items overflow [%d]%v array", len(result), max, kind,
 				// kind := fs.item.Index(0).Kind()
-				return fmt.Errorf(
+				return []error{fmt.Errorf(
 					"maximum number of values for %s argument "+
 						"is %d but passed %d values",
 					arg, max, len(result),
-				)
+				)}
 			}
 
 			err = setSequence(fc.item, result)
@@ -164,11 +169,11 @@ func unmarshalOpt(obj interface{}, args []string) error {
 		}
 
 		if err != nil {
-			return err
+			errs = append(errs, err)
 		}
 	}
 
-	return nil
+	return errs
 }
 
 // The setSequence sets slice into item.

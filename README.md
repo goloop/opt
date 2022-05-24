@@ -4,7 +4,7 @@
 [![Go Report Card](https://goreportcard.com/badge/github.com/goloop/opt)](https://goreportcard.com/report/github.com/goloop/opt) [![License](https://img.shields.io/badge/license-BSD-blue)](https://github.com/goloop/opt/blob/master/LICENSE) [![License](https://img.shields.io/badge/godoc-YES-green)](https://godoc.org/github.com/goloop/opt)
 
 
-*Version: v1.0.0*
+*Version: v1.0.1*
 
 # opt
 
@@ -399,7 +399,8 @@ The Unmarshal function can cause panic or return an error. Panic occurs only whe
 
 Panic occurs when the structure contains incorrect parsing fields or other technical problems. For example:
 
-- the object is not transmitted by pointer;
+- the object isn't a structure;
+- the object isn't transmitted by pointer;
 - a non-string type field is specified for the `opt:"?"` documentation field;
 - field for positional arguments `opt:"[]"` is not a list (slice/array);
 - field has structure type (except url.URL);
@@ -447,6 +448,18 @@ if err := opt.Unmarshal(&args); err != nil {
 - `./app --port=hello` - error: 'hello' is incorrect value;
 - `./app --h yes` - error: 'yes' has incorrect type, bool expected.
 
+If an error occurs, the text of the help info will still be generated. Therefore, a parsing error can be accompanied by a display of this one:
+
+```go
+switch err := opt.Unmarshal(&args); {
+case err != nil:
+	log.Fatalf("%v\n\nError: %v", args.Doc, err)
+case args.Help:
+	fmt.Println(args.Doc)
+	os.Exit(0)
+}
+```
+
 ## Usage
 
 #### func  Unmarshal
@@ -462,6 +475,14 @@ and pointers, array or slice from thous types (i.e. *int, ..., []int, ...,
 []bool, ..., [2]*url.URL, etc.).
 
 For other filed's types (like chan, map ...) will be returned an error.
+
+The function generates a panic if:
+
+- the object isn't a structure; - the object isn't transmitted by pointer; - a
+non-string type field is specified for the `opt:"?"` doc-field; - field for
+positional arguments `opt:"[]"` is not a list (slice/array); - field has
+structure type (except url.URL); - field has pointer to structure type (except
+*url.URL).
 
 Use the following tags in the fields of structure to set the marshing
 parameters:
