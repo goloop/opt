@@ -2,242 +2,329 @@ package opt
 
 import (
 	"fmt"
-	"path/filepath"
 	"reflect"
+	"sort"
+	"strconv"
 	"strings"
+	"unicode/utf8"
 )
 
-// Helper is the interface implemented by types that can
-// returns help information about app.
-type Helper interface {
-	HelpOPT(string) string
+// The following concepts are used to generate text help
+// based on command line arguments:
+//
+// |******| _________________________________________________________ Title
+// Options:           |*****************************************| ___ Suffix
+//     -v, --verbose - when set to true, displays more detailed \
+//                     information about the job, otherwise only| --- Item
+//                     critical information will be displayed;  /
+//         --debug   - when set to true, displays log info.
+//                  |*| _____________________________________________ Separator
+// |****************| _______________________________________________ Prefix
+
+// The separator separates the command line (prefix)
+// from the documentation line (suffix).
+const separator = " "
+
+// The optionItems is struct of the help line for options section.
+type optionItems struct {
+	short string // short flag name
+	long  string // long flag name
+	items string // prefix of items
+	help  string // information string
 }
 
-// Usager is the interface implemented by types that can
-// returns information about using command line parameters.
-type Usager interface {
-	UsageOPT(string) string
+// The posItems is struct of the help line for positional section.
+type posItems struct {
+	short string // short flag name: 1, 2, ..., N
+	help  string // information string
 }
 
-// posArgsNum structure for calculating positional arguments and
-// create a text specification about it.
-type posArgsNum struct {
-	exists bool // true if positional arguments is exists
-	array  int  // array of positional arguments
-	enum   int  // enumerated positional argument counter
-}
+// The getOptionPrefix returns the prefix of the documentation line in which
+// the options are specified: -v; -v, --verbose; --verbose. The second
+// argument is the length of this one.
+func getOptionPrefix(short, long string) (string, int) {
+	var result string
 
-// Count counts the number of positional arguments and
-// returns true if a count has been made.
-func (pan *posArgsNum) Count(field *fieldSample) bool {
-	switch {
-	case field.TagSample.Short == "?" || field.TagSample.Short == "0":
-		// Ignore zero positional argument and help data field.
-		return true
-	case field.TagSample.Short == "[]":
-		// There is a slice for positional arguments.
-		if field.Item.Kind() == reflect.Array {
-			// There is an array - to determine max positional
-			// arguments number.
-			pan.array = field.Item.Type().Len()
-		}
-		pan.exists = true
-		return true
-	case positionalKeyRgx.Match([]byte(field.TagSample.Short)):
-		// Enumerated fields for positional arguments.
-		pan.enum++
-		pan.exists = true
-		return true
-	}
-
-	return false
-}
-
-// Spec returns positional arguments specifier if given or empty string.
-func (pan *posArgsNum) Spec() string {
-	// The data in the array has the highest priority.
-	switch {
-	case pan.array != 0:
-		return fmt.Sprintf("a1, ..., a%d", pan.array)
-	case pan.enum != 0:
-		return fmt.Sprintf("a1, ..., a%d", pan.enum)
-	case pan.exists:
-		return "args..."
-	}
-
-	return ""
-}
-
-// The getHelp returns automatically generated help information.
-func getHelp(rv reflect.Value, f []*fieldSample, opts optSamples) (r string) {
-	// If objects implements Helper interface try to calling
-	// a custom Help method.
-	if rv.Type().Implements(reflect.TypeOf((*Helper)(nil)).Elem()) {
-		if m := rv.MethodByName("HelpOPT"); m.IsValid() {
-			tmp := m.Call([]reflect.Value{reflect.ValueOf(opts["0"])})
-			value := tmp[0].Interface()
-			r = fmt.Sprintf("%s\n\n", value.(string))
-		}
-	}
-
-	// If objects implements Usager interface try to calling
-	// a custom Usage method.
-	if rv.Type().Implements(reflect.TypeOf((*Usager)(nil)).Elem()) {
-		if m := rv.MethodByName("UsageOPT"); m.IsValid() {
-			tmp := m.Call([]reflect.Value{reflect.ValueOf(opts["0"])})
-			value := tmp[0].Interface()
-			r = fmt.Sprintf("%s%s", r, value.(string))
-		}
-	} else {
-		r = fmt.Sprintf("%s%s", r, getUsageHelp(f, opts))
-	}
-	r = fmt.Sprintf("%s%s\n", r, getArgumentsHelp(f))
-
-	return
-}
-
-// The combineNames correctly combines the short and long option name.
-// If first is true returns the first non-empty name only.
-func combineNames(short, long string, first bool) (r string) {
-	var tmp string
-
+	// Add one dash to the short flag and comma if there is a long flag.
 	if short != "" {
-		r = "-" + short
-	}
-
-	if (r == "" || !first) && long != "" {
-		tmp = "--" + long
-		if r != "" {
-			r = fmt.Sprintf("%s,%s", r, tmp)
-		} else {
-			r = tmp
+		short = fmt.Sprintf("-%s", short)
+		if long != "" {
+			short = fmt.Sprintf("%s, ", short)
 		}
 	}
 
-	return
+	// Add two dashes to the long flag.
+	if long != "" {
+		long = fmt.Sprintf("--%s", long)
+	}
+
+	// The layout has a format: 4 spaces, 4 positions for a short flag,
+	// the everything else is a long flag.
+	result = strings.TrimRight(fmt.Sprintf("    %-4s%s", short, long), " ")
+	return result, utf8.RuneCountInString(result)
 }
 
-// The cutHelp cut the help line on short pices.
-// It is assumed that the maximum length of the left + right side should
-// not exceed 79 characters.
-func cutHelp(help string, start int) string {
-	var (
-		tmp    string
-		lines  []string = []string{}
-		indent string   = fmt.Sprintf(fmt.Sprintf("%s-%ds", "%", start), "")
-	)
+// The wrapHelpMsg splits the line doc by the right extreme space,
+// into lines no more than wc in length, taking into account the
+// length of the tab.
+//
+// Adds a sep to the first line.
+func wrapHelpMsg(sep, str string, tab, wc int) []string {
+	var result []string
 
-	tmp = indent
-	for _, item := range strings.Split(help, " ") {
-		if len(tmp+" "+item) <= 79 {
-			tmp += " " + item
-		} else {
-			if tmp != indent {
-				lines = append(lines, tmp)
-				tmp = fmt.Sprintf("%5s%s %s", " ", indent, item)
-			} else {
-				lines = append(lines, " "+item)
-				tmp = indent
+	// Don't add a prefix if help string isn't specified.
+	if str == "" {
+		return result
+	}
+
+	// Line wrapping occurs by words. Divide the line into words and
+	// create new lines where the length of the words does not exceed
+	// the specified.
+	wc = wc - tab // line length without tabs
+	line, count := "", utf8.RuneCountInString
+	for _, word := range strings.Split(str, " ") {
+		l := count(line) + count(word)
+
+		switch {
+		case line == "":
+			line = word
+		case l >= wc:
+			if len(result) == 0 {
+				line = sep + line
 			}
+			result = append(result, line)
+			line = word
+		default:
+			line += " " + word
 		}
 	}
 
-	lines = append(lines, tmp)
-	return strings.TrimPrefix(strings.Join(lines, "\n"), indent)
+	if line != "" {
+		if len(result) == 0 {
+			line = sep + line
+		}
+		result = append(result, line)
+	}
+
+	return result
 }
 
-// The getUsageHelp returns help in a single line -
-// application launch structure.
-func getUsageHelp(fields []*fieldSample, opts optSamples) (r string) {
-	var (
-		name string
-		pan  = posArgsNum{}
-	)
+// The getOptionBlock returns the text of the documentation
+// for optional arguments. The second parameter will damage -1 if
+// there is no container `[]` for processing positional parameters,
+// 0 - if such a container exists and its size is not limited (for slice),
+// more than 0 if the number of elements in this container is limited (array).
+func getOptionBlock(fcl fieldCastList, am argMap) (string, int) {
+	var lines = []string{}
 
-	// Get name of the application.
-	path := opts["0"]
-	_, file := filepath.Split(path)
-	r = fmt.Sprintf("Usage: ./%s ", file)
-
-	// Regular options.
-	for _, f := range fields {
-		// Ignore positional arguments but control
-		// the number of required arguments.
-		if c := pan.Count(f); c {
+	// Go through all the fields, make a prefix for the help line,
+	// which includes the available arguments. Determine the largest
+	// prefix of arguments. Ignore fields that do not require a optionItems.
+	maxPrefixLen := 0      // the maximum length of the prefix
+	posArgsExists := false // true if some field has [] opt marker
+	posArgsLen := 0        // number of positional arguments
+	items := make([]optionItems, 0, len(fcl))
+	for _, fc := range fcl {
+		// Ignore technical fields.
+		switch flag := fc.tagGroup.shortFlag; {
+		case fc.tagGroup.shortFlag == "[]":
+			// The number of positional arguments in an array is
+			// limited by its size. For slice are no restrictions.
+			switch fc.item.Kind() {
+			case reflect.Array:
+				posArgsLen = fc.item.Len()
+				if posArgsLen > 0 {
+					posArgsLen-- // 0 element it's an app ptah
+				}
+				posArgsExists = posArgsLen != 0
+			case reflect.Slice:
+				posArgsLen = 0
+				posArgsExists = true
+			}
+			fallthrough
+		case fc.tagGroup.shortFlag == "?":
+			// Field for uploading documentation.
+			fallthrough
+		case orderFlagRgx.Match([]byte(flag)):
+			// Fixed positional argument.
 			continue
 		}
 
-		// Create launch options.
-		name = combineNames(f.TagSample.Short, f.TagSample.Long, true)
-		if f.Item.Kind() != reflect.Bool {
-			name += " value"
+		// Make prefix from the items.
+		p, l := getOptionPrefix(fc.tagGroup.shortFlag, fc.tagGroup.longFlag)
+		items = append(items, optionItems{
+			fc.tagGroup.shortFlag,
+			fc.tagGroup.longFlag,
+			p,
+			fc.tagGroup.helpMsg,
+		})
+
+		// Determine the largest prefix of arguments. The option is doesn't
+		// displayed in the documentation if it doesn't have a help message.
+		if l > maxPrefixLen && fc.tagGroup.helpMsg != "" {
+			maxPrefixLen = l
+		}
+	}
+
+	// Add title "Options" if this part is exists.
+	if len(items) != 0 {
+		lines = append(lines, "Options:")
+		sort.Slice(items, func(i, j int) bool {
+			return items[i].short < items[j].short &&
+				items[i].long < items[j].long
+		})
+	}
+
+	// Concatenation of argument prefix and suffix.
+	// Such a line cannot be too long.
+	sep, rcis := separator, utf8.RuneCountInString
+	for _, item := range items {
+		// Add a semicolon to each line, and if this
+		// is the last line, a period.
+		help := item.help
+		switch {
+		case help == "":
+			continue
+		default:
+			help += ";"
 		}
 
-		r += fmt.Sprintf("[%s] ", name)
+		for j, l := range wrapHelpMsg(sep, help, maxPrefixLen, 79) {
+			if j == 0 {
+				tpl := fmt.Sprintf("%%-%ds%%s", maxPrefixLen)
+				lines = append(lines, fmt.Sprintf(tpl, item.items, l))
+				continue
+			}
+
+			tpl := fmt.Sprintf("%%%ds", maxPrefixLen+rcis(l)+len(sep))
+			lines = append(lines, fmt.Sprintf(tpl, l))
+		}
+
 	}
 
-	// Positional arguments.
-	if spec := pan.Spec(); len(spec) != 0 {
-		r += "-- " + spec
+	// Result.
+	result := ""
+	if top := len(lines); top != 0 {
+		lines[top-1] = strings.TrimSuffix(lines[top-1], ";") + "."
+		result = strings.Join(lines, "\n")
 	}
 
-	return
+	pos := -1
+	if posArgsExists {
+		pos = posArgsLen
+	}
+
+	return result, pos
 }
 
-// The getArgumentsHelp returns a list of arguments
-// as string and their help line.
-func getArgumentsHelp(fields []*fieldSample) (r string) {
-	var (
-		leftside  string
-		rightside string
-		pattern   string
-		lines     [][]string
-		max       int
+// The getPositionalBlock returns the text of the
+// documentation about positional arguments.
+func getPositionalBlock(fcl fieldCastList, posArgsLen int) string {
+	var lines []string
 
-		pan = posArgsNum{}
-	)
+	// Collect positional arguments.
+	items := make([]posItems, 0, len(fcl))
+	for _, fc := range fcl {
+		if f := fc.tagGroup.shortFlag; orderFlagRgx.Match([]byte(f)) {
+			items = append(items, posItems{f, fc.tagGroup.helpMsg})
+		}
+	}
 
-	// Regular options.
-	for _, f := range fields {
-		// Ignore positional arguments but control
-		// the number of required arguments.
-		if c := pan.Count(f); c {
+	// Sort position arguments.
+	sort.Slice(items, func(i, j int) bool {
+		return items[i].short < items[j].short
+	})
+
+	// Update the count of positional arguments.
+	// P.s. use len(items)-1 because the null argument doesn't
+	// count as it is the path to the application.
+	if l := len(items) - 1; posArgsLen <= 0 && l >= 0 {
+		id, err := strconv.Atoi(items[l].short)
+		switch {
+		case err != nil:
+			fallthrough
+		case id <= l:
+			posArgsLen = l
+		default:
+			posArgsLen = id
+		}
+	}
+
+	// Create information.
+	maxPrefixLen, subitems := 6, []string{}
+	sep, rcis := separator, utf8.RuneCountInString
+	for _, item := range items {
+		// Add a semicolon to each line, and if this
+		// is the last line, a period.
+		help := item.help
+		switch {
+		case help == "" || item.short == "0":
 			continue
+		default:
+			help += ";"
 		}
 
-		// Determine available option names and create pattern for left side.
-		leftside = combineNames(f.TagSample.Short, f.TagSample.Long, false)
-		if m := len(leftside); m > max {
-			max = m
-			pattern = fmt.Sprintf("%s-%ds", "%", max+2)
-		}
+		for j, l := range wrapHelpMsg(sep, help, maxPrefixLen, 79) {
+			if j == 0 {
+				tpl := fmt.Sprintf("%%%ds%%s", maxPrefixLen)
+				subitems = append(subitems, fmt.Sprintf(tpl, item.short, l))
+				continue
+			}
 
-		// Help text.
-		rightside = "..."
-		if f.TagSample.Help != "" {
-			rightside = f.TagSample.Help
+			tpl := fmt.Sprintf("%%%ds", maxPrefixLen+rcis(l)+len(sep))
+			subitems = append(subitems, fmt.Sprintf(tpl, l))
 		}
-
-		// Add data into line.
-		lines = append(lines, []string{leftside, rightside})
 	}
 
-	// Positional arguments.
-	if spec := pan.Spec(); len(spec) != 0 {
-		leftside = spec
-		rightside = "positional arguments"
-		if m := len(leftside); m > max {
-			pattern = fmt.Sprintf("%s-%ds", "%", max+2)
+	// Create subtitle.
+	subtitle := ""
+	switch {
+	case posArgsLen < 0:
+		return ""
+	case posArgsLen == 0:
+		subtitle = "The app takes an unlimited number of positional arguments"
+	case posArgsLen == 1:
+		subtitle = "The app takes an one of positional argument"
+	default:
+		tpl := "The app takes %d of the positional arguments"
+		subtitle = fmt.Sprintf(tpl, posArgsLen)
+	}
+
+	if top := len(subitems); top != 0 {
+		subitems[top-1] = strings.TrimSuffix(subitems[top-1], ";") + "."
+		subtitle += ", including:"
+	} else {
+		subtitle += "."
+	}
+
+	// Result.
+	lines = append(lines, "Positional arguments:")
+	lines = append(lines, strings.Join(wrapHelpMsg("", subtitle, 0, 79), "\n"))
+	if len(items) != 0 {
+		lines = append(lines, subitems...)
+	}
+
+	return strings.Join(lines, "\n")
+}
+
+// The getHelp returns help on using command line options.
+func getHelp(fcl fieldCastList, am argMap) string {
+	var result []string
+
+	// Generate option block.
+	optText, posArgsLen := getOptionBlock(fcl, am)
+	if optText != "" {
+		result = append(result, optText)
+	}
+
+	// Generate positional block.
+	posText := getPositionalBlock(fcl, posArgsLen)
+	if posText != "" {
+		if optText != "" {
+			result = append(result, "")
 		}
-		lines = append(lines, []string{leftside, rightside})
+		result = append(result, posText)
 	}
 
-	// Join lines.
-	for _, line := range lines {
-		leftside = fmt.Sprintf(pattern, line[0])
-		tmp := fmt.Sprintf("    %s%s", leftside, cutHelp(line[1], max+1))
-		r += "\n" + tmp
-	}
-
-	return
+	return strings.Join(result, "\n")
 }
