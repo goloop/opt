@@ -6,7 +6,8 @@ import (
 	"testing"
 )
 
-type Args struct {
+// The testArgs is example of the test args.
+type testArgs struct {
 	Host     string `opt:"host" alt:"h" def:"localhost"`
 	Port     int    `opt:"p" alt:"port" def:"8080"`
 	UserName string // default opt == user-name
@@ -24,12 +25,12 @@ func TestLongFlags(t *testing.T) {
 	split := func(str string) []string { return strings.Split(str, ":") }
 	tests := []struct {
 		Args     []string
-		Expected Args
+		Expected testArgs
 	}{
 		{
 			// ./app --host=0.0.0.0 --port 80 --user-name John --no-verb
 			split("./app:--host=0.0.0.0:--port:80:--user-name:John:--no-verb"),
-			Args{
+			testArgs{
 				Host:     "0.0.0.0",
 				Port:     80,
 				UserName: "John",
@@ -39,7 +40,7 @@ func TestLongFlags(t *testing.T) {
 		{
 			// ./app --HOST localhost --User-Name="John Smith"
 			split("./app:--HOST:localhost:--User-Name:John Smith"),
-			Args{
+			testArgs{
 				Host:     "localhost",
 				Port:     8080,
 				UserName: "John Smith",
@@ -49,7 +50,7 @@ func TestLongFlags(t *testing.T) {
 		{
 			// ./app --port 80 --verb=false
 			split("./app:--port:80:--verb=false"),
-			Args{
+			testArgs{
 				Host:     "localhost",
 				Port:     80,
 				UserName: "",
@@ -60,7 +61,7 @@ func TestLongFlags(t *testing.T) {
 
 	for _, test := range tests {
 		os.Args = test.Args
-		args := Args{}
+		args := testArgs{}
 		if err := Unmarshal(&args); err != nil {
 			t.Error(err)
 		}
@@ -93,30 +94,22 @@ func TestLongFlags(t *testing.T) {
 
 // TestShortFlags tests Unmarshal with short flags.
 func TestShortFlags(t *testing.T) {
-	args := Args{}
+	args := testArgs{}
 	split := func(str string) []string { return strings.Split(str, ":") }
 	tests := []struct {
 		Args     []string
-		Expected Args
+		Expected testArgs
 	}{
 		{
-			// Normal command line arguments:
 			// ./app -h 127.0.0.1 -p 80
 			split("./app:-h:127.0.0.1:-p80"),
-			Args{Host: "127.0.0.1", Port: 80},
+			testArgs{Host: "127.0.0.1", Port: 80},
 		},
 		{
-			//
 			// ./app --HOST localhost --User-Name="John Smith"
 			split("./app:--HOST:localhost:--User-Name:John Smith"),
-			Args{Host: "localhost", Port: 8080, UserName: "John Smith"},
+			testArgs{Host: "localhost", Port: 8080, UserName: "John Smith"},
 		},
-		// {
-		// 	// Default value for Host and UserName.
-		// 	// ./app --port 80
-		// 	split("./app:--port:80"),
-		// 	Args{Host: "localhost", Port: 80, UserName: ""},
-		// },
 	}
 
 	for _, test := range tests {
@@ -132,5 +125,17 @@ func TestShortFlags(t *testing.T) {
 		if args.Port != test.Expected.Port {
 			t.Errorf("expected %d but %d", test.Expected.Port, args.Port)
 		}
+	}
+}
+
+// TestUnmarshalErrors tests Unmarshal with errors.
+func TestUnmarshalErrors(t *testing.T) {
+	var args = struct {
+		Host string
+	}{}
+
+	os.Args = []string{"./apt", "-d", "-p"} // flags d and p doesn't exist
+	if err := Unmarshal(&args); err == nil {
+		t.Error("expected an error")
 	}
 }

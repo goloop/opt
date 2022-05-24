@@ -10,16 +10,16 @@ import (
 	"testing"
 )
 
-// UIFDataTestType the uint, int and float test type.
-type UIFDataTestType struct {
+// The testUIFDataTestType the uint, int and float test type.
+type testUIFDataTestType struct {
 	Value   string
 	Control string
 	Correct bool
 	Kind    reflect.Kind
 }
 
-// BoolDataTestType the boolean test type.
-type BoolDataTestType struct {
+// The testBoolDataTestType the boolean test type.
+type testBoolDataTestType struct {
 	Value   string
 	Control bool
 	Correct bool
@@ -510,7 +510,7 @@ func TestUnmarshalOptPositional(t *testing.T) {
 
 // TestStrToBool tests strToBool function.
 func TestStrToBool(t *testing.T) {
-	var tests = []BoolDataTestType{
+	var tests = []testBoolDataTestType{
 		{"", false, true},
 		{"0", false, true},
 		{"1", true, true},
@@ -545,7 +545,7 @@ func TestStrToBool(t *testing.T) {
 // TestStrToIntKind tests strToIntKind function.
 func TestStrToIntKind(t *testing.T) {
 	var (
-		tests    []UIFDataTestType
+		tests    []testUIFDataTestType
 		maxInt   = fmt.Sprintf("%d", math.MaxInt64-1)
 		maxInt8  = fmt.Sprintf("%d", math.MaxInt8-1)
 		maxInt16 = fmt.Sprintf("%d", math.MaxInt16-1)
@@ -559,7 +559,7 @@ func TestStrToIntKind(t *testing.T) {
 	}
 
 	// Test data.
-	tests = []UIFDataTestType{
+	tests = []testUIFDataTestType{
 		{"", "0", true, reflect.Int},
 		{"0", "0", true, reflect.Int},
 		{"-3", "-3", true, reflect.Int},
@@ -606,7 +606,7 @@ func TestStrToIntKind(t *testing.T) {
 // TestStrToUintKind tests strToUintKind function.
 func TestStrToUintKind(t *testing.T) {
 	var (
-		tests     []UIFDataTestType
+		tests     []testUIFDataTestType
 		maxUint   = "18446744073709551614"
 		maxUint8  = fmt.Sprintf("%d", math.MaxUint8-1)
 		maxUint16 = fmt.Sprintf("%d", math.MaxUint16-1)
@@ -620,7 +620,7 @@ func TestStrToUintKind(t *testing.T) {
 	}
 
 	// Test data.
-	tests = []UIFDataTestType{
+	tests = []testUIFDataTestType{
 		{"", "0", true, reflect.Uint},
 		{"0", "0", true, reflect.Uint},
 		{"3", "3", true, reflect.Uint},
@@ -661,13 +661,13 @@ func TestStrToUintKind(t *testing.T) {
 // TestStrToFloatKind tests strToFloatKind function.
 func TestStrToFloatKind(t *testing.T) {
 	var (
-		tests      []UIFDataTestType
+		tests      []testUIFDataTestType
 		maxFloat32 = fmt.Sprintf("%.2f", math.MaxFloat32-1)
 		maxFloat64 = fmt.Sprintf("%.2f", math.MaxFloat64-1)
 	)
 
 	// Test data.
-	tests = []UIFDataTestType{
+	tests = []testUIFDataTestType{
 		{"", "0.00", true, reflect.Float64},
 		{"0.0", "0.00", true, reflect.Float64},
 		{"3.0", "3.00", true, reflect.Float64},

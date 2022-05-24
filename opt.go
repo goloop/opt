@@ -15,6 +15,15 @@ import (
 //
 // For other filed's types (like chan, map ...) will be returned an error.
 //
+// The function generates a panic if:
+//
+// - the object isn't a structure;
+// - the object isn't transmitted by pointer;
+// - a non-string type field is specified for the `opt:"?"` doc-field;
+// - field for positional arguments `opt:"[]"` is not a list (slice/array);
+// - field has structure type (except url.URL);
+// - field has pointer to structure type (except *url.URL).
+//
 // Use the following tags in the fields of structure to
 // set the marshing parameters:
 //
@@ -51,5 +60,10 @@ import (
 //  //  Host: 0.0.0.0
 //  //  Port: 8080
 func Unmarshal(obj interface{}) error {
-	return unmarshalOpt(obj, os.Args)
+	if errs := unmarshalOpt(obj, os.Args); errs != nil {
+		// Returns only the first error.
+		return errs[0]
+	}
+
+	return nil
 }
