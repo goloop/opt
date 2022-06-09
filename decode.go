@@ -73,14 +73,14 @@ func unmarshalOpt(obj interface{}, args []string) []error {
 		)
 		arg = strings.Trim(arg, " or/and ")
 
-		value, kind := []string{}, fc.item.Kind()
+		value, kind, ok := []string{}, fc.item.Kind(), false
 		switch f := fc.tagGroup.shortFlag; {
 		case f == "[]":
 			// Get positional arguments.
 			value = am.posValues()
 		default:
 			// Get the values of the argument.
-			value = am.flagValue(
+			value, ok = am.flagValue(
 				fc.tagGroup.shortFlag,
 				fc.tagGroup.longFlag,
 				fc.tagGroup.defValue,
@@ -105,6 +105,14 @@ func unmarshalOpt(obj interface{}, args []string) []error {
 		case reflect.Array:
 			// If a separator is specified, the elements must be separated.
 			var result []string
+
+			// If the argMap.flagValue hasn't value it's returns
+			// []string{defValue} where defValue can be like "" -
+			// this is not valid for the list because if the command line
+			// argument has no data for the list this list must be empty!
+			if !ok && len(value) == 1 && value[0] == "" {
+				break
+			}
 
 			if sep := fc.tagGroup.sepList; sep != "" {
 				for _, item := range value {
@@ -133,6 +141,14 @@ func unmarshalOpt(obj interface{}, args []string) []error {
 			// the type of the one.
 			// If a separator is specified, the elements must be separated.
 			var result []string
+
+			// If the argMap.flagValue hasn't value it's returns
+			// []string{defValue} where defValue can be like "" -
+			// this is not valid for the list because if the command line
+			// argument has no data for the list this list must be empty!
+			if !ok && len(value) == 1 && value[0] == "" {
+				break
+			}
 
 			if sep := fc.tagGroup.sepList; sep != "" {
 				for _, item := range value {

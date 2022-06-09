@@ -277,13 +277,15 @@ func (am argMap) posValues() []string {
 }
 
 // The flagValue returns the value for the specified flag by
-// long and/or short name. If the value is not found - returns defValue.
+// long and/or short name with true as second param.
+// Returns defValue with false as second param if the value
+// is not found.
 func (am argMap) flagValue(
 	shortFlag string,
 	longFlag string,
 	defValue string,
 	sepList string,
-) []string {
+) ([]string, bool) {
 	var result []string
 
 	// Join all values from all types of flags (long/short).
@@ -296,7 +298,7 @@ func (am argMap) flagValue(
 
 	// Return default value.
 	if len(tmp) == 0 {
-		return []string{defValue}
+		return []string{defValue}, false
 	}
 
 	// Be sure to set the sequence of values that was in the command line.
@@ -313,5 +315,5 @@ func (am argMap) flagValue(
 		result = append(result, item.value)
 	}
 
-	return result
+	return result, true
 }
