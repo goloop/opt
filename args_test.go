@@ -107,7 +107,7 @@ func TestPositional(t *testing.T) {
 		}
 
 		// Check app name.
-		value := am.flagValue("0", "", "", "")
+		value, _ := am.flagValue("0", "", "", "")
 		if r := strings.Join(value, ""); r != tests[0][0] {
 			t.Errorf("%d test, expected %v but %v", i, tests[0][0], r)
 		}
@@ -140,7 +140,7 @@ func TestValue(t *testing.T) {
 			t.Error(err)
 		}
 
-		r := am.flagValue("U", "users", "Jan,Bob", "")
+		r, _ := am.flagValue("U", "users", "Jan,Bob", "")
 		if !reflect.DeepEqual(r, expected) {
 			t.Errorf("expected %v but %v", expected, r)
 		}
@@ -177,7 +177,7 @@ func TestSplit(t *testing.T) {
 			t.Error(err)
 		}
 
-		r := am.flagValue("U", "users", "Jan,Bob,Roy", "")
+		r, _ := am.flagValue("U", "users", "Jan,Bob,Roy", "")
 		if !equal(r, expected) {
 			t.Errorf("test %d, expected %v but %v", i, expected, r)
 		}
@@ -201,7 +201,7 @@ func TestSplitFolding(t *testing.T) {
 			t.Error(err)
 		}
 
-		r := am.flagValue("U", "users", "Jan,Bob,Roy", "")
+		r, _ := am.flagValue("U", "users", "Jan,Bob,Roy", "")
 		if !reflect.DeepEqual(r, expected) {
 			t.Errorf("test %d, expected %v but %v", i, expected, r)
 		}
