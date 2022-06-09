@@ -4,7 +4,7 @@
 [![Go Report Card](https://goreportcard.com/badge/github.com/goloop/opt)](https://goreportcard.com/report/github.com/goloop/opt) [![License](https://img.shields.io/badge/license-BSD-blue)](https://github.com/goloop/opt/blob/master/LICENSE) [![License](https://img.shields.io/badge/godoc-YES-green)](https://godoc.org/github.com/goloop/opt)
 
 
-*Version: v1.0.1*
+*Version: v1.0.3*
 
 # opt
 

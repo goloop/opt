@@ -29,7 +29,7 @@ Commands:
 		Create readme from the GoLang code
 		
 		Requires `godocdown`, install as:
-		go get github.com/robertkrimen/godocdown/godocdown
+		go instal github.com/robertkrimen/godocdown/godocdown
 	tag
 		Create git-tag with current version of package
 endef
@@ -51,7 +51,7 @@ cover:
 		go tool cover -html=/tmp/coverage.out
 readme:
 ifeq (, $(shell which godocdown))
-	@go get github.com/robertkrimen/godocdown/godocdown
+	@go install github.com/robertkrimen/godocdown/godocdown
 endif
 	@godocdown -plain=true -template=.godocdown.md ./ | \
 		sed -e 's/\.ModuleVersion/v${MODULE_VERSION}/g' > README.md
