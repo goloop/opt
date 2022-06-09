@@ -1,7 +1,7 @@
 // Package opt implements methods for manage arguments of the command-line.
 package opt
 
-const version = "1.0.1"
+const version = "1.0.2"
 
 // Version returns the version of the module.
 func Version() string {
