@@ -66,12 +66,20 @@ func unmarshalOpt(obj interface{}, args []string) []error {
 
 		// Contains a couple of arguments like: U, users, U or/and users -
 		// where U and users is synonyms.
-		arg := fmt.Sprintf(
-			"%s tmp/and %s",
-			fc.tagGroup.shortFlag,
-			fc.tagGroup.longFlag,
+		// arg := fmt.Sprintf(
+		// 	"%s tmp/and %s", 		// <- tmp/and is a temporary string
+		// 	fc.tagGroup.shortFlag,
+		// 	fc.tagGroup.longFlag,
+		// )
+		// arg = strings.Trim(arg, " or/and ")
+
+		arg := strings.ReplaceAll(
+			fmt.Sprintf("%s or/and %s",
+				fc.tagGroup.shortFlag,
+				fc.tagGroup.longFlag),
+			" or/and ",
+			"",
 		)
-		arg = strings.Trim(arg, " or/and ")
 
 		value, kind, ok := []string{}, fc.item.Kind(), false
 		switch f := fc.tagGroup.shortFlag; {
@@ -226,7 +234,7 @@ func setValue(item reflect.Value, value string) (err error) {
 		}
 	}()
 
-	var kind = item.Kind()
+	kind := item.Kind()
 
 	switch kind {
 	case reflect.Int, reflect.Int8, reflect.Int16,
@@ -424,7 +432,7 @@ func strToFloatKind(value string, kind reflect.Kind) (r float64, err error) {
 // strToBool convert string to bool type. Returns: result, error.
 // Returns default value for bool type if value is empty.
 func strToBool(value string) (bool, error) {
-	var epsilon = math.Nextafter(1, 2) - 1
+	epsilon := math.Nextafter(1, 2) - 1
 
 	// For empty string returns false.
 	if len(value) == 0 {

@@ -79,9 +79,9 @@ type fieldCast struct {
 // The fieldCastList is list of field data structure.
 type fieldCastList []*fieldCast
 
-// The flags returns map of field's flags in opt and alt tags.
+// The flags function returns map of field's flags in opt and alt tags.
 func (fcl fieldCastList) flags() map[string]int {
-	var result = make(map[string]int, len(fcl))
+	result := make(map[string]int, len(fcl))
 
 	for _, fc := range fcl {
 		if fc.tagGroup.shortFlag != "" {
@@ -96,61 +96,64 @@ func (fcl fieldCastList) flags() map[string]int {
 	return result
 }
 
+// The validateStruct checks whether the object is a pointer to the structure,
+// and returns reflect.Type and reflect.Value of the object. If the object is
+// not a pointer to the structure or object is nil, it returns an error.
+func validateStruct(obj interface{}) (reflect.Type, reflect.Value, error) {
+	rt, rv, err := reflect.TypeOf(obj), reflect.ValueOf(obj), error(nil)
+
+	// Check object type
+	// Object should be a pointer to a non-empty struct.
+	if obj == nil {
+		err = errors.New("obj is nil")
+	} else if rv.Kind() != reflect.Ptr || rv.IsNil() {
+		err = errors.New("obj should be a non-nil pointer to a struct")
+	} else if rv.Type().Elem().Kind() != reflect.Struct {
+		err = errors.New("obj should be a pointer to a struct")
+	} else if rv.Elem().NumField() == 0 {
+		err = errors.New("obj should be a pointer to a non-empty struct")
+	}
+
+	return rt, rv, err
+}
+
 // The getFieldCastList parses the structure fields and
 // returns list of the fieldCast.
 func getFieldCastList(obj interface{}) (fieldCastList, error) {
-	var result = fieldCastList{}
+	var result fieldCastList
 
-	// The obj argument should be a pointer to initialized object.
-	rt, rv := reflect.TypeOf(obj), reflect.ValueOf(obj)
-	switch {
-	case obj == nil:
-		fallthrough
-	case rt.Kind() != reflect.Ptr:
-		fallthrough
-	case rt.Elem().Kind() != reflect.Struct:
-		fallthrough
-	case !rv.Elem().IsValid():
-		err := errors.New("obj should be a pointer to an initialized struct")
+	// Check object type.
+	rt, rv, err := validateStruct(obj)
+	if err != nil {
 		return result, err
 	}
 
 	elem := rv.Elem()
+	urlS, urlP := reflect.TypeOf(url.URL{}), reflect.TypeOf((*url.URL)(nil))
 	for i := 0; i < elem.NumField(); i++ {
-		var err error
-
 		// Get tag data from the field.
 		field := rt.Elem().Field(i)
 
 		// Get tag group.
-		help := field.Tag.Get(tagNameHelpMsg)
-		def := field.Tag.Get(tagNameDefValue)
-		alt := strings.Trim(field.Tag.Get(tagNameAlt), " -")
+		tg, err := getTagGroup(
+			field.Name,
+			strings.Trim(field.Tag.Get(tagNameOpt), " -"),
+			strings.Trim(field.Tag.Get(tagNameAlt), " -"),
+			field.Tag.Get(tagNameDefValue),
+			field.Tag.Get(tagNameSepList),
+			field.Tag.Get(tagNameHelpMsg),
+		)
 
-		sep := defSep
-		if s := field.Tag.Get(tagNameSepList); s != "" {
-			sep = s
-		}
-
-		opt := field.Tag.Get(tagNameOpt)
-		if opt != defValueIgnored {
-			// Clear only if this field is not ignored.
-			strings.Trim(field.Tag.Get(tagNameOpt), " -")
-		}
-
-		tg, err := getTagGroup(field.Name, opt, alt, def, sep, help)
-		switch {
-		case err != nil:
+		if err != nil {
 			return result, err
-		case tg.isIgnored:
+		} else if tg.isIgnored {
 			continue
 		}
 
 		// Collect fields for further analysis.
 		item := elem.FieldByName(field.Name)
-		fc := fieldCast{field.Name, &tg, &item}
+		fc := fieldCast{fieldName: field.Name, tagGroup: &tg, item: &item}
 
-		// ...
 		kind := fc.item.Kind()
 		switch f := fc.tagGroup.shortFlag; {
 		case f == "?" && kind != reflect.String:
@@ -160,15 +163,13 @@ func getFieldCastList(obj interface{}) (fieldCastList, error) {
 			// To load positional arguments,
 			// the field must be of the slice type.
 			err = fmt.Errorf("%s field should be a list", fc.fieldName)
-		case kind == reflect.Struct:
+		case kind == reflect.Struct && fc.item.Type() != urlS:
 			// Supported url.URL struct only.
-			if fc.item.Type() != reflect.TypeOf(url.URL{}) {
-				err = fmt.Errorf("%s field has invalid type", fc.fieldName)
-			}
+			err = fmt.Errorf("%s field has invalid type", fc.fieldName)
 		case kind == reflect.Ptr:
 			// Pointer to the structure *url.URL only.
 			k, t := fc.item.Type().Elem().Kind(), fc.item.Type()
-			if k == reflect.Struct && t != reflect.TypeOf((*url.URL)(nil)) {
+			if k == reflect.Struct && t != urlP {
 				err = fmt.Errorf("%s field has invalid type", fc.fieldName)
 			}
 		}
@@ -183,16 +184,22 @@ func getFieldCastList(obj interface{}) (fieldCastList, error) {
 	return result, nil
 }
 
-// The getTagGroup ...
+// getTagGroup returns a tagGroup with the specified tag values.
 func getTagGroup(
-	fieldName string,
-	optTagValue string,
-	altTagValue string,
-	defTagValue string,
-	sepTagValue string,
+	fieldName,
+	optTagValue,
+	altTagValue,
+	defTagValue,
+	sepTagValue,
 	helpTagValue string,
 ) (tagGroup, error) {
-	var tg = tagGroup{}
+	var err error
+	// Create tag group with default values.
+	tg := tagGroup{
+		defValue: defTagValue,
+		sepList:  sepTagValue,
+		helpMsg:  helpTagValue,
+	}
 
 	// The fieldName must be used for an empty value of optTagValue.
 	if optTagValue == "" {
@@ -205,57 +212,32 @@ func getTagGroup(
 		}
 	}
 
-	// Default value and help info.
-	tg.defValue = defTagValue
-	tg.sepList = sepTagValue
-	tg.helpMsg = helpTagValue
-
-	switch optByte, altByte := []byte(optTagValue), []byte(altTagValue); {
-	case orderFlagRgx.Match(optByte):
-		tg.shortFlag = optTagValue
-	case shortFlagRgx.Match(optByte):
+	msg := "invalid %s tag value %s"
+	optByte, altByte := []byte(optTagValue), []byte(altTagValue)
+	if orderFlagRgx.Match(optByte) || shortFlagRgx.Match(optByte) {
 		tg.shortFlag = optTagValue
 		if longFlagRgx.Match(altByte) {
 			tg.longFlag = altTagValue
-		} else if len(altTagValue) != 0 {
-			return tg, fmt.Errorf(
-				"invalid %s tag value %s",
-				tagNameAlt, altTagValue,
-			)
+		} else if altTagValue != "" {
+			err = fmt.Errorf(msg, tagNameAlt, altTagValue)
 		}
-	case longFlagRgx.Match(optByte):
+	} else if longFlagRgx.Match(optByte) {
 		tg.longFlag = optTagValue
 		if shortFlagSafeRgx.Match(altByte) {
 			tg.shortFlag = altTagValue
-		} else if len(altTagValue) != 0 {
-			return tg, fmt.Errorf(
-				"invalid %s tag value %s",
-				tagNameAlt, altTagValue,
-			)
+		} else if altTagValue != "" {
+			err = fmt.Errorf(msg, tagNameAlt, altTagValue)
 		}
-	default:
-		if optTagValue == defValueIgnored {
-			tg.isIgnored = true
-		} else {
-			return tg, fmt.Errorf(
-				"invalid %s tag value %s",
-				tagNameOpt, optTagValue,
-			)
-		}
+	} else if optTagValue == defValueIgnored {
+		tg.isIgnored = true
+	} else {
+		err = fmt.Errorf(msg, tagNameOpt, optTagValue)
 	}
 
-	// The long flag is always lowercase.
-	if tg.longFlag != "" {
-		tg.longFlag = strings.ToLower(tg.longFlag)
-	}
-
-	// The maximum length of the flag cannot exceed 32 characters.
+	tg.longFlag = strings.ToLower(tg.longFlag)
 	if utf8.RuneCountInString(tg.longFlag) > 32 {
-		return tg, fmt.Errorf(
-			"%s is a very long name, maximum 32 characters",
-			tg.longFlag,
-		)
+		err = fmt.Errorf("%s is a very long name, max 32 chars", tg.longFlag)
 	}
 
-	return tg, nil
+	return tg, err
 }
