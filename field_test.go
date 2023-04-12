@@ -7,7 +7,7 @@ import (
 
 // TestGetFieldCastList tests getFieldCastList function.
 func TestGetFieldCastList(t *testing.T) {
-	var obj = struct {
+	obj := struct {
 		Pos0    string   `opt:"0" help:"app name"`
 		User    string   `opt:"U" alt:"user" help:"user nickname"`
 		Age     string   `opt:"age" def:"17" help:"age of user"`
@@ -23,7 +23,7 @@ func TestGetFieldCastList(t *testing.T) {
 // TestGetFieldCastListExceptions tests getFieldCastList function
 // for any exceptions.
 func TestGetFieldCastListExceptions(t *testing.T) {
-	var obj, sub = struct{}{}, 3
+	obj, sub := struct{}{}, 3
 
 	if _, err := getFieldCastList(nil); err == nil {
 		t.Error("there must be an error for nil value")
@@ -37,8 +37,8 @@ func TestGetFieldCastListExceptions(t *testing.T) {
 		t.Error("there must be an error for the non-object")
 	}
 
-	if _, err := getFieldCastList(&obj); err != nil {
-		t.Error(err)
+	if _, err := getFieldCastList(&obj); err == nil {
+		t.Error("there must be an error for the empty structure")
 	}
 }
 
@@ -129,12 +129,10 @@ func TestGetFieldCastListPtrStruct(t *testing.T) {
 // TestGetFieldCastListWrongTags tests getFieldCastList function
 // for field with wrong tags.
 func TestGetFieldCastListWrongTags(t *testing.T) {
-	var (
-		obj = struct {
-			Ignored bool   `opt:"-"`
-			User    string `opt:"user" alt:"***"` // incorrect *** tag
-		}{}
-	)
+	obj := struct {
+		Ignored bool   `opt:"-"`
+		User    string `opt:"user" alt:"***"` // incorrect *** tag
+	}{}
 
 	if _, err := getFieldCastList(&obj); err == nil {
 		t.Error("there must be an error for incorrect tag")
