@@ -1,10 +1,4 @@
-[//]: # (!!!Don't modify the README.md, use `make readme` to generate it!!!)
-
-
-[![Go Report Card](https://goreportcard.com/badge/github.com/goloop/opt)](https://goreportcard.com/report/github.com/goloop/opt) [![License](https://img.shields.io/badge/license-BSD-blue)](https://github.com/goloop/opt/blob/master/LICENSE) [![License](https://img.shields.io/badge/godoc-YES-green)](https://godoc.org/github.com/goloop/opt)
-
-
-*Version: v1.0.3*
+[![Go Report Card](https://goreportcard.com/badge/github.com/goloop/opt)](https://goreportcard.com/report/github.com/goloop/opt) [![License](https://img.shields.io/badge/license-MIT-brightgreen)](https://github.com/goloop/opt/blob/master/LICENSE) [![License](https://img.shields.io/badge/godoc-YES-green)](https://godoc.org/github.com/goloop/opt)
 
 # opt
 
@@ -14,7 +8,9 @@ Package opt implements methods for manage arguments of the command-line.
 
 To install this package we can use `go get`:
 
-    $ go get -u github.com/goloop/opt
+```
+$ go get -u github.com/goloop/opt
+```
 
 ## Usage
 
@@ -223,7 +219,7 @@ You can use the following tags to configure command line parsing rules:
 
 ### Tag `opt`
 
-Specifies the name of the short or long flag whose data must be entered in the appropriate field. If no tag is specified, it will be automatically set to the value of the field name converted to kebab-case. For example: `UserName` converts to `user-name`. 
+Specifies the name of the short or long flag whose data must be entered in the appropriate field. If no tag is specified, it will be automatically set to the value of the field name converted to kebab-case. For example: `UserName` converts to `user-name`.
 
 Has reserved values:
 

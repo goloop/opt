@@ -115,7 +115,7 @@ func wrapHelpMsg(sep, str string, tab, wc int) []string {
 // 0 - if such a container exists and its size is not limited (for slice),
 // more than 0 if the number of elements in this container is limited (array).
 func getOptionBlock(fcl fieldCastList, am argMap) (string, int) {
-	var lines = []string{}
+	lines := []string{}
 
 	// Go through all the fields, make a prefix for the help line,
 	// which includes the available arguments. Determine the largest

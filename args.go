@@ -39,10 +39,9 @@ type argMap map[string][]argValue
 // the flag --no-verbose - is it the no-verbose flag or the objection
 // for the verbose flag? This slice stores all available long flags
 // declared in the data structure.
-// func (am argMap) parse(args []string, shortFlags, longFlags flagMap) error {
 func (am argMap) parse(args []string, flags map[string]int) error {
 	// Controls of parsing state of positional arguments.
-	var posState = struct {
+	posState := struct {
 		order  int  // real index of the positional argument
 		active bool // true if switch to parsing of positional arguments
 	}{}
@@ -58,7 +57,7 @@ func (am argMap) parse(args []string, flags map[string]int) error {
 	// to take the following argument in the course of current
 	// iteration and to skip next one iteration.
 	for i := 0; i < len(args); i++ {
-		var item = args[i]
+		item := args[i]
 
 		switch {
 		case item == "--":
@@ -212,7 +211,7 @@ func (am argMap) parse(args []string, flags map[string]int) error {
 
 // The asFlat returns argMap as simple map[string][]string.
 func (am argMap) asFlat() map[string][]string {
-	var result = make(map[string][]string, len(am))
+	result := make(map[string][]string, len(am))
 
 	for key, items := range am {
 		tmp := make([]string, 0, len(items))
@@ -281,9 +280,9 @@ func (am argMap) posValues() []string {
 // Returns defValue with false as second param if the value
 // is not found.
 func (am argMap) flagValue(
-	shortFlag string,
-	longFlag string,
-	defValue string,
+	shortFlag,
+	longFlag,
+	defValue,
 	sepList string,
 ) ([]string, bool) {
 	var result []string

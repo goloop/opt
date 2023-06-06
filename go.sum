@@ -1,4 +1,2 @@
-github.com/goloop/scs v1.0.1 h1:6QnhDIH2pzrGrbwhCFSJWcqfjqu4z9cLfE3kpfeCx/4=
-github.com/goloop/scs v1.0.1/go.mod h1:De464a22sqV3KyrR0mqa8qgS6nSFpdeX5ePKEJxXNxo=
-github.com/robertkrimen/godocdown v0.0.0-20130622164427-0bfa04905481 h1:jMxcLa+VjJKhpCwbLUXAD15wJ+hhvXMLujCl3MkXpfM=
-github.com/robertkrimen/godocdown v0.0.0-20130622164427-0bfa04905481/go.mod h1:C9WhFzY47SzYBIvzFqSvHIR6ROgDo4TtdTuRaOMjF/s=
+github.com/goloop/scs v1.1.1 h1:ixqutFAtf1tZXZ/9nQLNKR0aRUIQiVGNozPnCfKssso=
+github.com/goloop/scs v1.1.1/go.mod h1:pUuCj5l3EDy+r8m8VZ505Z60BFgtEQ7+Qh0/VmJvrr8=
