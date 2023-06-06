@@ -21,7 +21,6 @@ type testArgs struct {
 
 // TestLongFlags tests Unmarshal with long flags.
 func TestLongFlags(t *testing.T) {
-
 	split := func(str string) []string { return strings.Split(str, ":") }
 	tests := []struct {
 		Args     []string
@@ -130,7 +129,7 @@ func TestShortFlags(t *testing.T) {
 
 // TestUnmarshalErrors tests Unmarshal with errors.
 func TestUnmarshalErrors(t *testing.T) {
-	var args = struct {
+	args := struct {
 		Host string
 	}{}
 

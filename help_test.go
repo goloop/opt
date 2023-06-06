@@ -8,7 +8,7 @@ import (
 
 // TestGetOptionPrefix tests getOptionPrefix function.
 func TestGetOptionPrefix(t *testing.T) {
-	var tests = []struct {
+	tests := []struct {
 		short  string
 		long   string
 		result string
@@ -34,7 +34,7 @@ func TestGetOptionPrefix(t *testing.T) {
 
 // TestWrapHelpMsg tests wrapHelpMsg function.
 func TestWrapHelpMsg(t *testing.T) {
-	var tests = []struct {
+	tests := []struct {
 		tab    int
 		wc     int
 		prefix string
@@ -76,7 +76,6 @@ func TestWrapHelpMsg(t *testing.T) {
 
 // TestGetOptionBlock tests getOptionBlock function.
 func TestGetOptionBlock(t *testing.T) {
-
 	var (
 		slice = reflect.ValueOf([]string{})
 		array = reflect.ValueOf([8]string{})
@@ -191,55 +190,53 @@ func TestGetOptionBlock(t *testing.T) {
 
 // TestGetPositionalBlock tests getPositionalBlock function.
 func TestGetPositionalBlock(t *testing.T) {
-	var (
-		tests = []struct {
-			fcl        fieldCastList
-			count      int
-			subPosText string
-		}{
-			{
-				fcl: fieldCastList{
-					&fieldCast{
-						tagGroup: &tagGroup{
-							shortFlag: "1",
-							helpMsg:   "port of serve",
-						},
-					},
-					&fieldCast{
-						tagGroup: &tagGroup{
-							shortFlag: "2",
-							helpMsg:   "host of serve",
-						},
+	tests := []struct {
+		fcl        fieldCastList
+		count      int
+		subPosText string
+	}{
+		{
+			fcl: fieldCastList{
+				&fieldCast{
+					tagGroup: &tagGroup{
+						shortFlag: "1",
+						helpMsg:   "port of serve",
 					},
 				},
-				count:      1,
-				subPosText: "1 port of serve",
-			},
-			{
-				fcl: fieldCastList{
-					&fieldCast{
-						tagGroup: &tagGroup{
-							shortFlag: "1",
-							helpMsg:   "port of serve",
-						},
-					},
-					&fieldCast{
-						tagGroup: &tagGroup{
-							shortFlag: "2",
-							helpMsg: "network host is a computer or other " +
-								"device connected to a computer network. " +
-								"A host may work as a server offering " +
-								"information resources, services, and " +
-								"applications to users or other hosts " +
-								"on the network",
-						},
+				&fieldCast{
+					tagGroup: &tagGroup{
+						shortFlag: "2",
+						helpMsg:   "host of serve",
 					},
 				},
-				count:      0,
-				subPosText: "2" + separator + "network host is a computer",
 			},
-		}
-	)
+			count:      1,
+			subPosText: "1 port of serve",
+		},
+		{
+			fcl: fieldCastList{
+				&fieldCast{
+					tagGroup: &tagGroup{
+						shortFlag: "1",
+						helpMsg:   "port of serve",
+					},
+				},
+				&fieldCast{
+					tagGroup: &tagGroup{
+						shortFlag: "2",
+						helpMsg: "network host is a computer or other " +
+							"device connected to a computer network. " +
+							"A host may work as a server offering " +
+							"information resources, services, and " +
+							"applications to users or other hosts " +
+							"on the network",
+					},
+				},
+			},
+			count:      0,
+			subPosText: "2" + separator + "network host is a computer",
+		},
+	}
 
 	for i, test := range tests {
 		posText := getPositionalBlock(test.fcl, test.count)

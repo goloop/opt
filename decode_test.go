@@ -107,7 +107,7 @@ func TestUnmarshalOptMix(t *testing.T) {
 	}
 
 	for i, test := range tests {
-		var d = data{}
+		d := data{}
 		if err := unmarshalOpt(&d, test); err != nil {
 			t.Error(err)
 			return // it makes no sense to display all errors
@@ -260,7 +260,7 @@ func TestUnmarshalOptNotStruct(t *testing.T) {
 		}
 	}()
 
-	var d = new(int)
+	d := new(int)
 	unmarshalOpt(d, []string{"/app", "5", "10"}) // panic is expected
 }
 
@@ -335,9 +335,7 @@ func TestWrongList(t *testing.T) {
 
 // TestStructUrl tests with pointer on struct.
 func TestStructUrl(t *testing.T) {
-	var (
-		site url.URL
-	)
+	var site url.URL
 
 	split := func(str string) []string { return strings.Split(str, ":") }
 	test := split("./app:--site:%$")
@@ -476,7 +474,7 @@ func TestUnmarshalOptPositional(t *testing.T) {
 		ABC  []int  `opt:"[]" help:"position args as list"`
 	}
 
-	var d, sum = data{}, 0
+	d, sum := data{}, 0
 
 	if err := unmarshalOpt(&d, []string{"/app", "5", "10", "15"}); err != nil {
 		t.Error(err)
@@ -510,7 +508,7 @@ func TestUnmarshalOptPositional(t *testing.T) {
 
 // TestStrToBool tests strToBool function.
 func TestStrToBool(t *testing.T) {
-	var tests = []testBoolDataTestType{
+	tests := []testBoolDataTestType{
 		{"", false, true},
 		{"0", false, true},
 		{"1", true, true},

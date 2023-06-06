@@ -27,38 +27,38 @@ import (
 // Use the following tags in the fields of structure to
 // set the marshing parameters:
 //
-//  opt  indicates a short or long option;
-//  alt  optional, alternative option for position opt,
-//       if a long option is specified in opt, a short option
-//       can be specified in alt or vice versa;
-//  def  default value (if empty, sets the default value
-//       for the field type of structure);
-//  help brief help about the option.
+//	opt  indicates a short or long option;
+//	alt  optional, alternative option for position opt,
+//	     if a long option is specified in opt, a short option
+//	     can be specified in alt or vice versa;
+//	def  default value (if empty, sets the default value
+//	     for the field type of structure);
+//	help brief help about the option.
 //
 // Suppose that the some values was set into argument-line as:
 //
-//  ./main --host=0.0.0.0 -p8080
+//	./main --host=0.0.0.0 -p8080
 //
 // Structure example:
 //
-//  // Args structure for containing values from the argument-line.
-//  type Args struct {
-//  	Host string `opt:"host" def:"localhost"`
-//  	Port int    `opt:"p" alt:"port" def:"80" help:"port number"`
-//  	Help bool   `opt:"h" alt:"help"`
-//  }
+//	// Args structure for containing values from the argument-line.
+//	type Args struct {
+//		Host string `opt:"host" def:"localhost"`
+//		Port int    `opt:"p" alt:"port" def:"80" help:"port number"`
+//		Help bool   `opt:"h" alt:"help"`
+//	}
 //
 // Unmarshal data from the argument-line into Args struct.
 //
-//  var args Args
-//  if err := opt.Unmarshal(&args); err != nil {
-//  	log.Fatal(err)
-//  }
+//	var args Args
+//	if err := opt.Unmarshal(&args); err != nil {
+//		log.Fatal(err)
+//	}
 //
-//  fmt.Printf("Host: %s\nPort: %d\n", args.Host, args.Port)
-//  // Output:
-//  //  Host: 0.0.0.0
-//  //  Port: 8080
+//	fmt.Printf("Host: %s\nPort: %d\n", args.Host, args.Port)
+//	// Output:
+//	//  Host: 0.0.0.0
+//	//  Port: 8080
 func Unmarshal(obj interface{}) error {
 	if errs := unmarshalOpt(obj, os.Args); errs != nil {
 		// Returns only the first error.
