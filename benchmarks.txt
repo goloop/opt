@@ -1,0 +1,11 @@
+--- FAIL: BenchmarkUnmarshalSimple
+    benchmarks_test.go:41: invalid argument --debug
+goos: linux
+goarch: arm64
+pkg: github.com/goloop/opt
+BenchmarkUnmarshalComplex-6   	   53811	     22344 ns/op	   10850 B/op	     321 allocs/op
+BenchmarkArgMapParse-6        	  812223	      1350 ns/op	    1057 B/op	      18 allocs/op
+BenchmarkGetTagGroup-6        	 1434732	       841.5 ns/op	      48 B/op	       6 allocs/op
+FAIL
+exit status 1
+FAIL	github.com/goloop/opt	4.604s
