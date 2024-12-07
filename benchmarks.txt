@@ -1,11 +1,14 @@
---- FAIL: BenchmarkUnmarshalSimple
-    benchmarks_test.go:41: invalid argument --debug
 goos: linux
 goarch: arm64
 pkg: github.com/goloop/opt
-BenchmarkUnmarshalComplex-6   	   53811	     22344 ns/op	   10850 B/op	     321 allocs/op
-BenchmarkArgMapParse-6        	  812223	      1350 ns/op	    1057 B/op	      18 allocs/op
-BenchmarkGetTagGroup-6        	 1434732	       841.5 ns/op	      48 B/op	       6 allocs/op
-FAIL
-exit status 1
-FAIL	github.com/goloop/opt	4.604s
+BenchmarkParseArgMap-6          	 3196140	       369.7 ns/op	     136 B/op	       7 allocs/op
+BenchmarkParseArgMapComplex-6   	  872613	      1170 ns/op	     997 B/op	      15 allocs/op
+BenchmarkUnmarshalSimple-6      	  238440	      4980 ns/op	    1408 B/op	      64 allocs/op
+BenchmarkUnmarshalComplex-6     	   62811	     19459 ns/op	    9441 B/op	     272 allocs/op
+BenchmarkGetTagGroup/Simple-6   	 4113250	       288.3 ns/op	     112 B/op	       3 allocs/op
+BenchmarkGetTagGroup/WithSeparator-6         	 6616659	       178.8 ns/op	     104 B/op	       2 allocs/op
+BenchmarkSetValue/String-6                   	153829363	         7.770 ns/op	       0 B/op	       0 allocs/op
+BenchmarkSetValue/Int64-6                    	52647613	        22.60 ns/op	       0 B/op	       0 allocs/op
+BenchmarkSetValue/Bool-6                     	100000000	        10.84 ns/op	       0 B/op	       0 allocs/op
+PASS
+ok  	github.com/goloop/opt	12.412s
