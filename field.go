@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"net/url"
 	"reflect"
-	"regexp"
 	"strings"
 	"unicode/utf8"
 
@@ -43,21 +42,55 @@ const (
 	defSep = ""
 )
 
-var (
-	// The orderFlagRgx a regular expression to check if a string is a number.
-	orderFlagRgx = regexp.MustCompile(`^\d+$`)
+// isASCIILetter reports whether b is an ASCII letter (A-Z or a-z).
+func isASCIILetter(b byte) bool {
+	return (b >= 'A' && b <= 'Z') || (b >= 'a' && b <= 'z')
+}
 
-	// The shortFlagRgx a regular expression to check
-	// if a string is short option.
-	shortFlagRgx = regexp.MustCompile(`^(\?|\[\]|[A-Za-z]{1})$`)
+// isOrderFlag reports whether s is a positional-index flag: a non-empty
+// run of decimal digits ("0", "1", ..., "10", ...).
+func isOrderFlag(s string) bool {
+	if s == "" {
+		return false
+	}
 
-	// The shortFlagSafeRgx as the shortFlagRgx but without the
-	// ability to win special tags like: ?, [].
-	shortFlagSafeRgx = regexp.MustCompile(`^([A-Za-z]{1})$`)
+	for i := 0; i < len(s); i++ {
+		if s[i] < '0' || s[i] > '9' {
+			return false
+		}
+	}
 
-	// The longRgx a regular expression to check if a string is long option.
-	longFlagRgx = regexp.MustCompile(`^[A-Za-z]{1}[A-Za-z\-1-9]{1,}$`)
-)
+	return true
+}
+
+// isShortFlagSafe reports whether s is a single ASCII letter, i.e. a short
+// option name without the special "?" and "[]" markers.
+func isShortFlagSafe(s string) bool {
+	return len(s) == 1 && isASCIILetter(s[0])
+}
+
+// isShortFlag reports whether s is a valid short option name: a single ASCII
+// letter or one of the special markers "?" (doc field) and "[]" (positional).
+func isShortFlag(s string) bool {
+	return s == "?" || s == "[]" || isShortFlagSafe(s)
+}
+
+// isLongFlag reports whether s is a valid long option name: an ASCII letter
+// followed by one or more letters, digits or dashes (at least two chars).
+func isLongFlag(s string) bool {
+	if len(s) < 2 || !isASCIILetter(s[0]) {
+		return false
+	}
+
+	for i := 1; i < len(s); i++ {
+		b := s[i]
+		if !isASCIILetter(b) && (b < '0' || b > '9') && b != '-' {
+			return false
+		}
+	}
+
+	return true
+}
 
 // The tagGroup is the tag group of a field.
 type tagGroup struct {
@@ -213,17 +246,16 @@ func getTagGroup(
 	}
 
 	msg := "invalid %s tag value %s"
-	optByte, altByte := []byte(optTagValue), []byte(altTagValue)
-	if orderFlagRgx.Match(optByte) || shortFlagRgx.Match(optByte) {
+	if isOrderFlag(optTagValue) || isShortFlag(optTagValue) {
 		tg.shortFlag = optTagValue
-		if longFlagRgx.Match(altByte) {
+		if isLongFlag(altTagValue) {
 			tg.longFlag = altTagValue
 		} else if altTagValue != "" {
 			err = fmt.Errorf(msg, tagNameAlt, altTagValue)
 		}
-	} else if longFlagRgx.Match(optByte) {
+	} else if isLongFlag(optTagValue) {
 		tg.longFlag = optTagValue
-		if shortFlagSafeRgx.Match(altByte) {
+		if isShortFlagSafe(altTagValue) {
 			tg.shortFlag = altTagValue
 		} else if altTagValue != "" {
 			err = fmt.Errorf(msg, tagNameAlt, altTagValue)

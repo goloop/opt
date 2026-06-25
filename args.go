@@ -17,6 +17,17 @@ type argValue struct {
 	value string // value for the argument
 }
 
+// looksLikeNumber reports whether s is a negative-number token such as
+// "-5" or "-3.14". Such tokens must be treated as a value (or positional
+// argument), not as a flag, so that options can receive negative numbers.
+func looksLikeNumber(s string) bool {
+	if len(s) < 2 || s[0] != '-' {
+		return false
+	}
+
+	return (s[1] >= '0' && s[1] <= '9') || s[1] == '.'
+}
+
 // The argMap a special type of saving arguments in the form of a map.
 //
 // Save the list of values in the map not as []string but as []argValue
@@ -122,15 +133,18 @@ func (am argMap) parse(args []string, flags map[string]int) error {
 			if data != "" {
 				value = string(data)
 			} else if i+1 < len(args) {
-				// Try to take the value from the next item.
-				if tmp := args[i+1]; !strings.HasPrefix(tmp, "-") {
+				// Try to take the value from the next item. A negative
+				// number (-5, -3.14) is a value, not a flag.
+				tmp := args[i+1]
+				if !strings.HasPrefix(tmp, "-") || looksLikeNumber(tmp) {
 					value = tmp
 					i++ // be sure to move to the right by one position
 				}
 			}
 
 			am[key] = append(am[key], argValue{i, value})
-		case strings.HasPrefix(item, "-") && !posState.active:
+		case strings.HasPrefix(item, "-") && !looksLikeNumber(item) &&
+			!posState.active:
 			// Short flag. The short flags can be grouped. The value can be
 			// concatenated to the flag or as a series of subsequent entries
 			// in the list.
@@ -175,10 +189,15 @@ func (am argMap) parse(args []string, flags map[string]int) error {
 				if j == len(group)-1 {
 					// For last flag in flag list only.
 					if len(data) != 0 {
+						// Strip a leading "=" so that "-p=80" works
+						// symmetrically with the long form "--port=80".
 						value = strings.TrimLeft(string(data), " ")
+						value = strings.TrimPrefix(value, "=")
 					} else if i+1 < len(args) {
-						// Try to take the value from the next item.
-						if tmp := args[i+1]; !strings.HasPrefix(tmp, "-") {
+						// Try to take the value from the next item. A
+						// negative number (-5, -3.14) is a value, not a flag.
+						tmp := args[i+1]
+						if !strings.HasPrefix(tmp, "-") || looksLikeNumber(tmp) {
 							value = tmp
 							i++ // be sure to move to the right by one position
 						}

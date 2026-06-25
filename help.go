@@ -145,7 +145,7 @@ func getOptionBlock(fcl fieldCastList, am argMap) (string, int) {
 		case fc.tagGroup.shortFlag == "?":
 			// Field for uploading documentation.
 			fallthrough
-		case orderFlagRgx.Match([]byte(flag)):
+		case isOrderFlag(flag):
 			// Fixed positional argument.
 			continue
 		}
@@ -169,9 +169,19 @@ func getOptionBlock(fcl fieldCastList, am argMap) (string, int) {
 	// Add title "Options" if this part is exists.
 	if len(items) != 0 {
 		lines = append(lines, "Options:")
+
+		// Sort by a single stable key: the short flag if present,
+		// otherwise the long flag. A conjunction of two comparisons
+		// is not a valid strict-weak ordering (e.g. short-only options
+		// where long == "" never sort).
+		key := func(o optionItems) string {
+			if o.short != "" {
+				return o.short
+			}
+			return o.long
+		}
 		sort.Slice(items, func(i, j int) bool {
-			return items[i].short < items[j].short &&
-				items[i].long < items[j].long
+			return key(items[i]) < key(items[j])
 		})
 	}
 
@@ -225,7 +235,7 @@ func getPositionalBlock(fcl fieldCastList, posArgsLen int) string {
 	// Collect positional arguments.
 	items := make([]posItems, 0, len(fcl))
 	for _, fc := range fcl {
-		if f := fc.tagGroup.shortFlag; orderFlagRgx.Match([]byte(f)) {
+		if f := fc.tagGroup.shortFlag; isOrderFlag(f) {
 			items = append(items, posItems{f, fc.tagGroup.helpMsg})
 		}
 	}
