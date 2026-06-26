@@ -79,9 +79,7 @@ func (am argMap) parse(
 
 	// Remove all keys from the map that could be there
 	// from the previous parsing. We can't use am = make(argMap) here.
-	for key := range am {
-		delete(am, key)
-	}
+	clear(am)
 
 	// Parse all the input arguments. Read elements on an index
 	// instead of by means of range as sometimes it is necessary
@@ -241,7 +239,7 @@ func (am argMap) parse(
 			//   ./app  5 10 -dUGoloop --verbose -- 15
 			//
 			// where 5, 10, 15 is positional arguments.
-			am[fmt.Sprint(posState.order)] = []argValue{{i, item}}
+			am[strconv.Itoa(posState.order)] = []argValue{{i, item}}
 			posState.order++
 		}
 	}
@@ -297,18 +295,8 @@ func (am argMap) posValues() []string {
 	// Return only the values of these arguments.
 	result := make([]string, 0, len(tmp))
 	for _, item := range tmp {
-		// A positional argument can have only one value, for example:
-		// ./app one two three "Hello World" five  - five positional arguments,
-		// but each has one meaning without exception:
-		// "0": []string{"./app"},
-		// "1": []string{"one"},
-		// "2": []string{"two"},
-		// ...,
-		// "5": []string{"five"}.
-		//
-		// if len(item.value) != 1 {
-		//     panic("this event will never happen")
-		// }
+		// A positional argument always has exactly one value, e.g.
+		// "./app one two three" -> "0": ["./app"], "1": ["one"], etc.
 		result = append(result, item.value[0])
 	}
 

@@ -10,11 +10,11 @@ import (
 // returns an error.
 //
 // Unmarshal method supports the following field's types: int, int8, int16,
-// int32, int64, uin, uint8, uin16, uint32, in64, float32, float64, string,
-// bool, url.URL and pointers, array or slice from thous types (i.e. *int, ...,
+// int32, int64, uint, uint8, uint16, uint32, uint64, float32, float64, string,
+// bool, url.URL and pointers, array or slice from those types (i.e. *int, ...,
 // []int, ..., []bool, ..., [2]*url.URL, etc.).
 //
-// For other filed's types (like chan, map ...) will be returned an error.
+// For other field's types (like chan, map ...) will be returned an error.
 //
 // The function generates a panic if:
 //
@@ -60,7 +60,7 @@ import (
 //	// Output:
 //	//  Host: 0.0.0.0
 //	//  Port: 8080
-func Unmarshal(obj interface{}) error {
+func Unmarshal(obj any) error {
 	// Join all collected errors so the caller sees every problem at once
 	// (errors.Join returns nil for an empty/all-nil slice).
 	return errors.Join(unmarshalOpt(obj, os.Args)...)

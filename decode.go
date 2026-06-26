@@ -22,10 +22,10 @@ import (
 // like: chan, map, etc..
 //
 // unmarshalOpt method supports the following field's types: int, int8, int16,
-// int32, int64, uin, uint8, uin16, uint32, in64, float32, float64, string,
-// bool, url.URL and pointers, array or slice from thous types (i.e. *int, ...,
+// int32, int64, uint, uint8, uint16, uint32, uint64, float32, float64, string,
+// bool, url.URL and pointers, array or slice from those types (i.e. *int, ...,
 // []int, ..., []bool, ..., [2]*url.URL, etc.).
-func unmarshalOpt(obj interface{}, args []string) []error {
+func unmarshalOpt(obj any, args []string) []error {
 	var errs []error
 
 	// Analyze the structure and return a list of molds
@@ -64,22 +64,9 @@ func unmarshalOpt(obj interface{}, args []string) []error {
 			continue
 		}
 
-		// Contains a couple of arguments like: U, users, U or/and users -
-		// where U and users is synonyms.
-		// arg := fmt.Sprintf(
-		// 	"%s tmp/and %s", 		// <- tmp/and is a temporary string
-		// 	fc.tagGroup.shortFlag,
-		// 	fc.tagGroup.longFlag,
-		// )
-		// arg = strings.Trim(arg, " or/and ")
-
-		arg := strings.ReplaceAll(
-			fmt.Sprintf("%s or/and %s",
-				fc.tagGroup.shortFlag,
-				fc.tagGroup.longFlag),
-			" or/and ",
-			"",
-		)
+		// Name of the option for error messages: the short and long
+		// flags joined (either may be empty), e.g. "U", "users", "Uusers".
+		arg := fc.tagGroup.shortFlag + fc.tagGroup.longFlag
 
 		value, kind, ok := []string{}, fc.item.Kind(), false
 		switch f := fc.tagGroup.shortFlag; {
@@ -95,46 +82,32 @@ func unmarshalOpt(obj interface{}, args []string) []error {
 				fc.tagGroup.sepList,
 			)
 
-			// The user in the command line tries to pass arguments as
-			// list to a field that doesn't have the slice or array type.
+			// A repeated option was given to a non-list field: keep
+			// the last value (last one wins).
 			if len(value) > 1 {
 				if kind != reflect.Array && kind != reflect.Slice {
-					// In this situation, we need to take the
-					// last value in the list.
-					//
-					// return fmt.Errorf("%s used more than once", arg)
 					value = []string{value[len(value)-1]}
 				}
 			}
 		}
 
+		// If the argMap.flagValue hasn't value it's returns
+		// []string{defValue} where defValue can be like "" - this is not
+		// valid for a list because if the command line argument has no
+		// data for the list this list must be empty!
+		isEmptyList := !ok && len(value) == 1 && value[0] == ""
+
 		// Set values of the desired type.
 		switch kind {
 		case reflect.Array:
-			// If a separator is specified, the elements must be separated.
-			var result []string
-
-			// If the argMap.flagValue hasn't value it's returns
-			// []string{defValue} where defValue can be like "" -
-			// this is not valid for the list because if the command line
-			// argument has no data for the list this list must be empty!
-			if !ok && len(value) == 1 && value[0] == "" {
+			if isEmptyList {
 				break
 			}
 
-			if sep := fc.tagGroup.sepList; sep != "" {
-				for _, item := range value {
-					tmp := strings.Split(item, sep)
-					result = append(result, tmp...)
-				}
-			} else {
-				result = value
-			}
-
+			// If a separator is specified, the elements must be separated.
+			result := splitValues(value, fc.tagGroup.sepList)
 			if max := fc.item.Type().Len(); len(result) > max {
 				// Array overflow.
-				// -> "%d items overflow [%d]%v array", len(result), max, kind,
-				// kind := fs.item.Index(0).Kind()
 				return []error{fmt.Errorf(
 					"maximum number of values for %s argument "+
 						"is %d but passed %d values",
@@ -144,29 +117,12 @@ func unmarshalOpt(obj interface{}, args []string) []error {
 
 			err = setSequence(fc.item, result)
 		case reflect.Slice:
-			// Be sure to set Len equal Cap and more than zero.
-			// The slice must have at least one element to determine
-			// the type of the one.
-			// If a separator is specified, the elements must be separated.
-			var result []string
-
-			// If the argMap.flagValue hasn't value it's returns
-			// []string{defValue} where defValue can be like "" -
-			// this is not valid for the list because if the command line
-			// argument has no data for the list this list must be empty!
-			if !ok && len(value) == 1 && value[0] == "" {
+			if isEmptyList {
 				break
 			}
 
-			if sep := fc.tagGroup.sepList; sep != "" {
-				for _, item := range value {
-					tmp := strings.Split(item, sep)
-					result = append(result, tmp...)
-				}
-			} else {
-				result = value
-			}
-
+			// If a separator is specified, the elements must be separated.
+			result := splitValues(value, fc.tagGroup.sepList)
 			if len(result) != 0 {
 				size := len(result)
 				tmp := reflect.MakeSlice(fc.item.Type(), size, size)
@@ -198,6 +154,21 @@ func unmarshalOpt(obj interface{}, args []string) []error {
 	}
 
 	return errs
+}
+
+// splitValues splits every element of values by sep and returns the
+// flattened result. An empty sep leaves the values unchanged.
+func splitValues(values []string, sep string) []string {
+	if sep == "" {
+		return values
+	}
+
+	out := make([]string, 0, len(values))
+	for _, v := range values {
+		out = append(out, strings.Split(v, sep)...)
+	}
+
+	return out
 }
 
 // The setSequence fills item (array or slice) from seq, left to right.
@@ -262,12 +233,8 @@ func setValue(item reflect.Value, value string) (err error) {
 	case reflect.String:
 		item.SetString(value)
 	case reflect.Ptr:
-		// // Will not be allowed by the getFieldCast method.
-		// if item.Type() != reflect.TypeOf((*url.URL)(nil)) {
-		// 	return fmt.Errorf("%s field has invalid type", item.Type().Name())
-		// }
-
-		// The url.URL struct only.
+		// Pointer to the url.URL struct only (other types are rejected
+		// earlier by getFieldCastList).
 		u, err := url.Parse(value)
 		if err != nil {
 			return err
@@ -275,12 +242,8 @@ func setValue(item reflect.Value, value string) (err error) {
 
 		item.Set(reflect.ValueOf(u))
 	case reflect.Struct:
-		// // Will not be allowed by the getFieldCast method.
-		// if item.Type() != reflect.TypeOf(url.URL{}) {
-		// 	return fmt.Errorf("%s field has invalid type", item.Type().Name())
-		// }
-
-		// The url.URL struct only.
+		// The url.URL struct only (other types are rejected earlier
+		// by getFieldCastList).
 		u, err := url.Parse(value)
 		if err != nil {
 			return err
@@ -379,7 +342,7 @@ func strToUintKind(value string, kind reflect.Kind) (r uint64, err error) {
 		}
 	case reflect.Uint32:
 		if r > math.MaxUint32 {
-			return 0, fmt.Errorf("strToUint32: %d overflows uint32", r)
+			return 0, fmt.Errorf("%d overflows uint32", r)
 		}
 	case reflect.Uint64:
 		// If there was no exception during the conversion,

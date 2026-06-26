@@ -155,7 +155,7 @@ func (fcl fieldCastList) boolFlags() map[string]bool {
 // The validateStruct checks whether the object is a pointer to the structure,
 // and returns reflect.Type and reflect.Value of the object. If the object is
 // not a pointer to the structure or object is nil, it returns an error.
-func validateStruct(obj interface{}) (reflect.Type, reflect.Value, error) {
+func validateStruct(obj any) (reflect.Type, reflect.Value, error) {
 	rt, rv, err := reflect.TypeOf(obj), reflect.ValueOf(obj), error(nil)
 
 	// Check object type
@@ -175,7 +175,7 @@ func validateStruct(obj interface{}) (reflect.Type, reflect.Value, error) {
 
 // The getFieldCastList parses the structure fields and
 // returns list of the fieldCast.
-func getFieldCastList(obj interface{}) (fieldCastList, error) {
+func getFieldCastList(obj any) (fieldCastList, error) {
 	var result fieldCastList
 
 	// Check object type.
