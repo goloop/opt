@@ -27,7 +27,7 @@ func TestParse(t *testing.T) {
 
 	am := argMap{}
 	for _, test := range tests {
-		if err := am.parse(test, flags); err != nil {
+		if err := am.parse(test, flags, nil); err != nil {
 			t.Error(err)
 		}
 
@@ -52,7 +52,7 @@ func TestParseMultiflags(t *testing.T) {
 
 	am := argMap{}
 	for _, test := range tests {
-		if err := am.parse(test, flags); err != nil {
+		if err := am.parse(test, flags, nil); err != nil {
 			t.Error(err)
 		}
 
@@ -74,7 +74,7 @@ func TestParseErrors(t *testing.T) {
 
 	am := argMap{}
 	for _, test := range tests {
-		if err := am.parse(test, flags); err == nil {
+		if err := am.parse(test, flags, nil); err == nil {
 			t.Error("an error on a non-existent flag is expected")
 		}
 	}
@@ -97,7 +97,7 @@ func TestPositional(t *testing.T) {
 
 	for i, test := range tests {
 		am := argMap{}
-		if err := am.parse(test, flags); err != nil {
+		if err := am.parse(test, flags, nil); err != nil {
 			t.Error(err)
 		}
 
@@ -136,7 +136,7 @@ func TestValue(t *testing.T) {
 
 	am := argMap{}
 	for _, test := range tests {
-		if err := am.parse(test, flags); err != nil {
+		if err := am.parse(test, flags, nil); err != nil {
 			t.Error(err)
 		}
 
@@ -173,7 +173,7 @@ func TestSplit(t *testing.T) {
 
 	am := argMap{}
 	for i, test := range tests {
-		if err := am.parse(test, flags); err != nil {
+		if err := am.parse(test, flags, nil); err != nil {
 			t.Error(err)
 		}
 
@@ -197,7 +197,7 @@ func TestSplitFolding(t *testing.T) {
 
 	am := argMap{}
 	for i, test := range tests {
-		if err := am.parse(test, flags); err != nil {
+		if err := am.parse(test, flags, nil); err != nil {
 			t.Error(err)
 		}
 

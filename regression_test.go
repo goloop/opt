@@ -119,6 +119,137 @@ func TestOptionSortShortOnly(t *testing.T) {
 	}
 }
 
+// TestEmptyEqualsValue covers BUG-04: "--flag=" with an explicitly empty
+// value means empty/zero, not the "true" switch and not the next token.
+func TestEmptyEqualsValue(t *testing.T) {
+	os.Args = []string{"./app", "--port=", "10"}
+	a := edgeArgs{}
+	if err := Unmarshal(&a); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if a.Port != 0 {
+		t.Errorf("expected Port=0, got %d", a.Port)
+	}
+
+	// The trailing "10" must not be swallowed as the value of --port.
+	if want := []string{"10"}; !reflect.DeepEqual(a.Pos, want) {
+		t.Errorf("expected Pos=%v, got %v", want, a.Pos)
+	}
+}
+
+// boolArgs is used by the boolean-grab regression tests.
+type boolArgs struct {
+	Verbose bool     `opt:"v" alt:"verbose"`
+	Pos     []string `opt:"[]"`
+}
+
+// TestBoolDoesNotEatPositional covers BUG-05: a boolean option is a pure
+// switch (Linux getopt style) and never consumes the following token, so a
+// positional argument after a boolean flag is preserved. A boolean is set
+// to false only via "--no-flag" or the "=" form.
+func TestBoolDoesNotEatPositional(t *testing.T) {
+	split := func(s string) []string { return strings.Split(s, ":") }
+	tests := []struct {
+		args    []string
+		verbose bool
+		pos     []string
+	}{
+		{split("./app:-v:5"), true, []string{"5"}},                // short + pos
+		{split("./app:--verbose:5"), true, []string{"5"}},         // long + pos
+		{split("./app:--verbose:false"), true, []string{"false"}}, // not eaten
+		{split("./app:--verbose=false"), false, nil},              // "=" sets false
+		{split("./app:--no-verbose"), false, nil},                 // no- sets false
+		{split("./app:-v"), true, nil},                            // bare switch
+	}
+
+	for i, test := range tests {
+		os.Args = test.args
+		a := boolArgs{}
+		if err := Unmarshal(&a); err != nil {
+			t.Errorf("%d: unexpected error: %v", i, err)
+			continue
+		}
+
+		if a.Verbose != test.verbose {
+			t.Errorf("%d: expected Verbose=%v, got %v",
+				i, test.verbose, a.Verbose)
+		}
+
+		if !reflect.DeepEqual(a.Pos, test.pos) {
+			t.Errorf("%d: expected Pos=%v, got %v", i, test.pos, a.Pos)
+		}
+	}
+}
+
+// TestPositionalHelpNumericSort covers BUG-08: positional arguments in the
+// help block are sorted and counted numerically, so "10" comes after "2".
+func TestPositionalHelpNumericSort(t *testing.T) {
+	fcl := fieldCastList{
+		&fieldCast{tagGroup: &tagGroup{shortFlag: "1", helpMsg: "first"}},
+		&fieldCast{tagGroup: &tagGroup{shortFlag: "10", helpMsg: "tenth"}},
+		&fieldCast{tagGroup: &tagGroup{shortFlag: "2", helpMsg: "second"}},
+	}
+
+	posText := getPositionalBlock(fcl, 0)
+	if !strings.Contains(posText, "takes 10") {
+		t.Errorf("expected count 10, got:\n%s", posText)
+	}
+
+	i1 := strings.Index(posText, "first")
+	i2 := strings.Index(posText, "second")
+	i10 := strings.Index(posText, "tenth")
+	if !(i1 >= 0 && i1 < i2 && i2 < i10) {
+		t.Errorf("expected order first < second < tenth, got:\n%s", posText)
+	}
+}
+
+// TestUnmarshalJoinsErrors covers BUG-09: Unmarshal reports every error,
+// not just the first one.
+func TestUnmarshalJoinsErrors(t *testing.T) {
+	os.Args = []string{"./app", "-a", "notnum", "-b", "alsonot"}
+	a := struct {
+		A int `opt:"a"`
+		B int `opt:"b"`
+	}{}
+
+	err := Unmarshal(&a)
+	if err == nil {
+		t.Fatal("expected an error")
+	}
+
+	msg := err.Error()
+	if !strings.Contains(msg, "notnum") || !strings.Contains(msg, "alsonot") {
+		t.Errorf("expected both errors, got: %q", msg)
+	}
+}
+
+// TestArrayPartialFill covers BUG-10: a fixed array is filled left to right;
+// fewer values than its size leave the rest at zero (previously the whole
+// array was silently zeroed), while more values than its size overflow.
+func TestArrayPartialFill(t *testing.T) {
+	os.Args = []string{"./app", "1", "2", "3"}
+	a := struct {
+		Pos [8]int `opt:"[]"`
+	}{}
+	if err := Unmarshal(&a); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if want := ([8]int{1, 2, 3, 0, 0, 0, 0, 0}); a.Pos != want {
+		t.Errorf("expected %v, got %v", want, a.Pos)
+	}
+
+	// More values than the array size is an overflow error.
+	os.Args = []string{"./app", "1", "2", "3", "4"}
+	b := struct {
+		Pos [3]int `opt:"[]"`
+	}{}
+	if err := Unmarshal(&b); err == nil {
+		t.Error("expected an overflow error")
+	}
+}
+
 // TestOptionSortMixed covers BUG-07: options are sorted by the short flag,
 // so "-a,--zebra" must precede "-b,--apple".
 func TestOptionSortMixed(t *testing.T) {

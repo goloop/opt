@@ -41,10 +41,10 @@ func TestUnmarshalOpt(t *testing.T) {
 	// Data for testing.
 	exp := "false:false:0.0.0.0:8000:Goloop:1024"
 	tests := [][]string{
-		split("/app:--host=0.0.0.0:-p8000:-d:false:--user-name:Goloop"),
+		split("/app:--host=0.0.0.0:-p8000:-d=false:--user-name:Goloop"),
 		split("/app:--host:0.0.0.0:--user-name:Goloop:-p:8000:-dfalse"),
 		split("/app:--user-name:Goloop:-p:8000:--host:0.0.0.0:--no-debug"),
-		split("/app:-p:8000:--host:0.0.0.0:--user-name:Goloop:-d:false"),
+		split("/app:-p:8000:--host:0.0.0.0:--user-name:Goloop:-d=false"),
 	}
 
 	// Testing.
@@ -83,15 +83,15 @@ func TestUnmarshalOptMix(t *testing.T) {
 		split("./app:-dU:Jack:-U:Bob:--USERS=Roy:--No-Verbose:-g:L R:5:10:15"),
 		split("./app:-d:--users:Jack,Bob,Roy:--no-verbose:-gL R:5:10:15"),
 		split("./app:-g:L R:-U:Jack:-UBob:-URoy:--no-verbose:-d:--:5:10:15"),
-		split("./app:5:-dU:Jack:--users:Bob,Roy:--verbose:false:-gL R:10:15"),
+		split("./app:5:-dU:Jack:--users:Bob,Roy:--verbose=false:-gL R:10:15"),
 		split("./app:5:10:--no-verboSe:-dU:Jack:-U:Bob:-U:Roy:-g:L R:15"),
 		split("./app:5:10:15:-UJack:-UBob:-URoy:--verbose=false:-g:L R:-d"),
-		split("./app:5:10:15:-U:Jack:-UBob:-URoy:-d:--VERBOSE:false:-gL R"),
-		split("./app:5:-UJack:--no-verbose:-gL R:-UBob:-d:true:-URoy:10:15"),
-		split("./app:5:-UJack:-UBob:--verbose:false:-URoy:-gL R:-d:--:10:15"),
+		split("./app:5:10:15:-U:Jack:-UBob:-URoy:-d:--VERBOSE=false:-gL R"),
+		split("./app:5:-UJack:--no-verbose:-gL R:-UBob:-d=true:-URoy:10:15"),
+		split("./app:5:-UJack:-UBob:--verbose=false:-URoy:-gL R:-d:--:10:15"),
 		split("./app:5:-UJack,Bob,Roy:-gL R:-d:--no-verbose:--:10:15"),
-		split("./app:5:-UJack:--no-verbose:-gL R:-UBob:-d:true:-URoy:10"),
-		split("./app:-UJack:-UBob:--verbose:false:-URoy:-gL R:-d:--:5"),
+		split("./app:5:-UJack:--no-verbose:-gL R:-UBob:-d=true:-URoy:10"),
+		split("./app:-UJack:-UBob:--verbose=false:-URoy:-gL R:-d:--:5"),
 		split("./app:-UJack,Bob,Roy:-gL R:-d:--no-verbose"),
 	}
 
@@ -295,7 +295,10 @@ func TestUnmarshalOptBoolWrong(t *testing.T) {
 		Bool *bool
 	}{&b}
 
-	test := split("./app:--bool:yes")
+	// An explicit non-boolean value (via "=") is an error. Without "="
+	// a boolean flag does not consume the next token, so "--bool yes"
+	// would mean bool=true plus a positional "yes" (see takeNextValue).
+	test := split("./app:--bool=yes")
 	if err := unmarshalOpt(&objPtr, test); err == nil {
 		t.Error("expected error")
 	}
@@ -305,7 +308,7 @@ func TestUnmarshalOptBoolWrong(t *testing.T) {
 		Bool bool
 	}{}
 
-	test = split("./app:--bool:yes")
+	test = split("./app:--bool=yes")
 	if err := unmarshalOpt(&objElem, test); err == nil {
 		t.Error("expected error")
 	}

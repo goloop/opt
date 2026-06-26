@@ -43,7 +43,7 @@ func unmarshalOpt(obj interface{}, args []string) []error {
 
 	// Parse options.
 	am := argMap{}
-	if err := am.parse(args, fcl.flags()); err != nil {
+	if err := am.parse(args, fcl.flags(), fcl.boolFlags()); err != nil {
 		errs = append(errs, err)
 	}
 
@@ -200,24 +200,20 @@ func unmarshalOpt(obj interface{}, args []string) []error {
 	return errs
 }
 
-// The setSequence sets slice into item.
-func setSequence(item *reflect.Value, seq []string) (err error) {
-	// defer func() {
-	// 	// Catch the panic and return an exception as a value.
-	// 	if r := recover(); r != nil {
-	// 		err = fmt.Errorf("%v", r)
-	// 	}
-	// }()
-
-	if item.Len() != len(seq) {
-		return nil
+// The setSequence fills item (array or slice) from seq, left to right.
+//
+// For a fixed array, the size is the maximum number of elements: any
+// remaining elements keep their zero value when fewer values are given.
+// An oversized sequence is rejected earlier (array overflow), so seq is
+// never longer than item here; the bound is kept only defensively.
+func setSequence(item *reflect.Value, seq []string) error {
+	n := len(seq)
+	if l := item.Len(); n > l {
+		n = l
 	}
 
-	// Set values from sequence.
-	for i, value := range seq {
-		elem := item.Index(i)
-		err := setValue(elem, value)
-		if err != nil {
+	for i := 0; i < n; i++ {
+		if err := setValue(item.Index(i), seq[i]); err != nil {
 			return err
 		}
 	}

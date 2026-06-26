@@ -1,6 +1,7 @@
 package opt
 
 import (
+	"errors"
 	"os"
 )
 
@@ -60,10 +61,7 @@ import (
 //	//  Host: 0.0.0.0
 //	//  Port: 8080
 func Unmarshal(obj interface{}) error {
-	if errs := unmarshalOpt(obj, os.Args); errs != nil {
-		// Returns only the first error.
-		return errs[0]
-	}
-
-	return nil
+	// Join all collected errors so the caller sees every problem at once
+	// (errors.Join returns nil for an empty/all-nil slice).
+	return errors.Join(unmarshalOpt(obj, os.Args)...)
 }

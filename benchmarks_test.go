@@ -48,7 +48,7 @@ func BenchmarkParseArgMap(b *testing.B) {
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		am := make(argMap)
-		benchResult = am.parse(args, flags)
+		benchResult = am.parse(args, flags, nil)
 	}
 }
 
@@ -75,7 +75,7 @@ func BenchmarkParseArgMapComplex(b *testing.B) {
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		am := make(argMap)
-		benchResult = am.parse(args, flags)
+		benchResult = am.parse(args, flags, nil)
 	}
 }
 

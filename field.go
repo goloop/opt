@@ -129,6 +129,29 @@ func (fcl fieldCastList) flags() map[string]int {
 	return result
 }
 
+// The boolFlags returns the set of flag names (short and long) whose field is
+// of bool kind. It lets the parser avoid consuming a following positional
+// argument as the value of a boolean option.
+func (fcl fieldCastList) boolFlags() map[string]bool {
+	result := make(map[string]bool, len(fcl))
+
+	for _, fc := range fcl {
+		if fc.item == nil || fc.item.Kind() != reflect.Bool {
+			continue
+		}
+
+		if fc.tagGroup.shortFlag != "" {
+			result[fc.tagGroup.shortFlag] = true
+		}
+
+		if fc.tagGroup.longFlag != "" {
+			result[fc.tagGroup.longFlag] = true
+		}
+	}
+
+	return result
+}
+
 // The validateStruct checks whether the object is a pointer to the structure,
 // and returns reflect.Type and reflect.Value of the object. If the object is
 // not a pointer to the structure or object is nil, it returns an error.

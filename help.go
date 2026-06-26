@@ -240,9 +240,12 @@ func getPositionalBlock(fcl fieldCastList, posArgsLen int) string {
 		}
 	}
 
-	// Sort position arguments.
+	// Sort positional arguments numerically: their names are indices
+	// ("1", "2", ..., "10"), so a lexical sort would place "10" before "2".
 	sort.Slice(items, func(i, j int) bool {
-		return items[i].short < items[j].short
+		a, _ := strconv.Atoi(items[i].short)
+		b, _ := strconv.Atoi(items[j].short)
+		return a < b
 	})
 
 	// Update the count of positional arguments.

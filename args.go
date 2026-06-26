@@ -28,6 +28,22 @@ func looksLikeNumber(s string) bool {
 	return (s[1] >= '0' && s[1] <= '9') || s[1] == '.'
 }
 
+// takeNextValue reports whether the next command-line token should be
+// consumed as the value of the current option.
+//
+// A boolean option is a pure switch (Linux getopt style): it never consumes
+// the following token, so "-v 5" keeps "5" as a positional argument. To set a
+// boolean explicitly use "--no-flag", "--flag=false" or "-f=false". For any
+// other option a token that looks like a flag is not a value, except for
+// negative numbers (-5, -3.14).
+func takeNextValue(next string, isBool bool) bool {
+	if isBool {
+		return false
+	}
+
+	return !strings.HasPrefix(next, "-") || looksLikeNumber(next)
+}
+
 // The argMap a special type of saving arguments in the form of a map.
 //
 // Save the list of values in the map not as []string but as []argValue
@@ -50,7 +66,11 @@ type argMap map[string][]argValue
 // the flag --no-verbose - is it the no-verbose flag or the objection
 // for the verbose flag? This slice stores all available long flags
 // declared in the data structure.
-func (am argMap) parse(args []string, flags map[string]int) error {
+func (am argMap) parse(
+	args []string,
+	flags map[string]int,
+	boolFlags map[string]bool,
+) error {
 	// Controls of parsing state of positional arguments.
 	posState := struct {
 		order  int  // real index of the positional argument
@@ -94,6 +114,7 @@ func (am argMap) parse(args []string, flags map[string]int) error {
 			//
 			// where --user == "Goloop" and --verbose == false.
 			var flag, data string
+			var hasEq bool
 
 			// Separate the flags from the value, like:
 			// Example: --user=Goloop or --user Goloop where is user is a flag
@@ -105,7 +126,7 @@ func (am argMap) parse(args []string, flags map[string]int) error {
 			// but we don't change the case for value.
 			flag = strings.TrimPrefix(item, "--")
 			if tmp := strings.SplitN(flag, "=", 2); len(tmp) == 2 {
-				flag, data = strings.ToLower(tmp[0]), tmp[1]
+				flag, data, hasEq = strings.ToLower(tmp[0]), tmp[1], true
 			} else {
 				flag = strings.ToLower(flag)
 			}
@@ -132,14 +153,16 @@ func (am argMap) parse(args []string, flags map[string]int) error {
 			key, value := flag, "true"
 			if data != "" {
 				value = string(data)
-			} else if i+1 < len(args) {
-				// Try to take the value from the next item. A negative
-				// number (-5, -3.14) is a value, not a flag.
-				tmp := args[i+1]
-				if !strings.HasPrefix(tmp, "-") || looksLikeNumber(tmp) {
-					value = tmp
-					i++ // be sure to move to the right by one position
-				}
+			} else if hasEq {
+				// Explicit empty value: "--flag=" means an empty/zero
+				// value, not a "true" switch and not the next token.
+				value = ""
+			} else if i+1 < len(args) && takeNextValue(
+				args[i+1], boolFlags[key],
+			) {
+				// Take the value from the next item.
+				value = args[i+1]
+				i++ // be sure to move to the right by one position
 			}
 
 			am[key] = append(am[key], argValue{i, value})
@@ -193,14 +216,12 @@ func (am argMap) parse(args []string, flags map[string]int) error {
 						// symmetrically with the long form "--port=80".
 						value = strings.TrimLeft(string(data), " ")
 						value = strings.TrimPrefix(value, "=")
-					} else if i+1 < len(args) {
-						// Try to take the value from the next item. A
-						// negative number (-5, -3.14) is a value, not a flag.
-						tmp := args[i+1]
-						if !strings.HasPrefix(tmp, "-") || looksLikeNumber(tmp) {
-							value = tmp
-							i++ // be sure to move to the right by one position
-						}
+					} else if i+1 < len(args) && takeNextValue(
+						args[i+1], boolFlags[key],
+					) {
+						// Take the value from the next item.
+						value = args[i+1]
+						i++ // be sure to move to the right by one position
 					}
 				}
 
