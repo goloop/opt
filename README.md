@@ -1,4 +1,4 @@
-[![Go Report Card](https://goreportcard.com/badge/github.com/goloop/opt)](https://goreportcard.com/report/github.com/goloop/opt) [![License](https://img.shields.io/badge/license-MIT-brightgreen)](https://github.com/goloop/opt/blob/master/LICENSE) [![License](https://img.shields.io/badge/godoc-YES-green)](https://godoc.org/github.com/goloop/opt) [![Stay with Ukraine](https://img.shields.io/static/v1?label=Stay%20with&message=Ukraine%20♥&color=ffD700&labelColor=0057B8&style=flat)](https://u24.gov.ua/)
+[![Go Report Card](https://goreportcard.com/badge/github.com/goloop/opt/v2)](https://goreportcard.com/report/github.com/goloop/opt/v2) [![License](https://img.shields.io/badge/license-MIT-brightgreen)](https://github.com/goloop/opt/blob/master/LICENSE) [![License](https://img.shields.io/badge/godoc-YES-green)](https://pkg.go.dev/github.com/goloop/opt/v2) [![Stay with Ukraine](https://img.shields.io/static/v1?label=Stay%20with&message=Ukraine%20♥&color=ffD700&labelColor=0057B8&style=flat)](https://u24.gov.ua/)
 
 # opt
 
@@ -17,6 +17,25 @@ $ go get -u github.com/goloop/opt/v2
 To use this package import it as:
 
     import "github.com/goloop/opt/v2"
+
+## Migrating from v1.x
+
+v2 keeps the same struct-tag model and the `Unmarshal` entry point, but a few
+behaviours changed to match the POSIX/getopt conventions. When upgrading:
+
+- Update the import path to `github.com/goloop/opt/v2`.
+- Boolean flags are now switches and never take the next token. Replace
+  `--verbose false` with `--no-verbose` or `--verbose=false` (and `-v=false`
+  for the short form). `--verbose true` becomes just `--verbose`.
+- A boolean value must be a real boolean literal; `--debug=2` is now an error.
+- `--flag=` with an empty value means empty/zero, not `true`.
+- `Unmarshal` now returns all errors joined with `errors.Join` (the error text
+  changed, so do not match on it).
+- Requires Go 1.24 or newer.
+
+New in v2: `UnmarshalArgs` for parsing an arbitrary argument slice, the
+`required` tag modifier (`opt:"host,required"`), `time.Duration` fields, and
+negative numbers as values/positional arguments.
 
 ## Quick start
 

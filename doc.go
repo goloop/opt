@@ -9,22 +9,26 @@
 // Features:
 // - Parses command-line arguments into Go structs using struct tags
 // - Supports both short (-v) and long (--verbose) flag formats (Linux-style)
+// - Boolean flags are switches and never consume the next token (getopt-style)
+// - Accepts negative numbers as values and positional arguments (-5, -3.14)
 // - Handles positional arguments with automatic ordering
-// - Provides default values through struct tags
+// - Provides default values and required options through struct tags
 // - Generates help documentation automatically
 // - Supports grouped short flags (-abc equivalent to -a -b -c)
 // - Allows flag aliases through the alt tag
+// - Parses an arbitrary argument slice via UnmarshalArgs (not only os.Args)
 //
 // Supported field types:
 // - Basic types: int, int8, int16, int32, int64
 // - Unsigned types: uint, uint8, uint16, uint32, uint64
 // - Floating point: float32, float64
 // - Other basic types: string, bool
+// - Duration: time.Duration (accepts "30s", "1h30m", ...)
 // - URL types: url.URL and *url.URL
 // - Arrays and slices of the above types
 //
 // Struct tags:
-// - opt: Defines the primary flag name (required)
+// - opt: Primary flag name, optionally with comma modifiers (opt:"host,required")
 // - alt: Defines an alternative flag name (optional)
 // - def: Sets the default value (optional)
 // - sep: Specifies list separator for array/slice types (optional)
@@ -35,6 +39,9 @@
 // - "[]": Field will store positional arguments
 // - "-" : Field will be ignored during parsing
 // - "0", "1", ...: Field will store specific positional argument
+//
+// Tag modifiers (after the name, comma-separated):
+// - required: the option must be provided on the command line
 //
 // Example usage:
 //
