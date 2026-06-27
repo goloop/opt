@@ -93,7 +93,7 @@ func (am argMap) parse(
 			// Toggles the parser to read positional arguments.
 			//
 			// Example:
-			//   ./app 5 -UGoloop --verbose false -d -- 10 15
+			//   ./app 5 -UGoloop --no-verbose -d -- 10 15
 			//
 			// where 5, 10, 15 is positional arguments
 			// and 10 isn't a value for -d flag.
@@ -107,7 +107,6 @@ func (am argMap) parse(
 			// Example:
 			//   ./app --user Goloop --no-verbose
 			//   ./app --user=Goloop --verbose=false
-			//   ./app --user Goloop --verbose false
 			//   ./app --user Goloop
 			//
 			// where --user == "Goloop" and --verbose == false.

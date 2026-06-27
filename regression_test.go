@@ -5,6 +5,7 @@ import (
 	"reflect"
 	"strings"
 	"testing"
+	"time"
 )
 
 // edgeArgs is a struct used by the parsing regression tests.
@@ -247,6 +248,119 @@ func TestArrayPartialFill(t *testing.T) {
 	}{}
 	if err := Unmarshal(&b); err == nil {
 		t.Error("expected an overflow error")
+	}
+}
+
+// TestUnmarshalArgs covers the exported UnmarshalArgs entry point that parses
+// an arbitrary argument slice instead of os.Args.
+func TestUnmarshalArgs(t *testing.T) {
+	var cfg struct {
+		Host string `opt:"host" def:"localhost"`
+		Port int    `opt:"p" alt:"port" def:"8080"`
+	}
+
+	args := []string{"app", "--host", "0.0.0.0", "-p", "80"}
+	if err := UnmarshalArgs(&cfg, args); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if cfg.Host != "0.0.0.0" || cfg.Port != 80 {
+		t.Errorf("got host=%q port=%d", cfg.Host, cfg.Port)
+	}
+}
+
+// TestRequiredModifier covers the "required" modifier: a required option must
+// be present on the command line, otherwise Unmarshal reports an error.
+func TestRequiredModifier(t *testing.T) {
+	type cfg struct {
+		Host string `opt:"host,required"`
+		Port int    `opt:"p" def:"80"`
+	}
+
+	// Missing required option -> error.
+	missing := cfg{}
+	if err := UnmarshalArgs(&missing, []string{"app", "-p", "8080"}); err == nil {
+		t.Error("expected an error for the missing required --host")
+	}
+
+	// Provided -> ok.
+	ok := cfg{}
+	if err := UnmarshalArgs(&ok, []string{"app", "--host", "x"}); err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	if ok.Host != "x" {
+		t.Errorf("expected Host=x, got %q", ok.Host)
+	}
+}
+
+// TestRequiredPositional covers "required" on a positional list: at least one
+// positional argument must be present.
+func TestRequiredPositional(t *testing.T) {
+	type cfg struct {
+		Args []string `opt:"[],required"`
+	}
+
+	if err := UnmarshalArgs(&cfg{}, []string{"app"}); err == nil {
+		t.Error("expected an error for missing required positional args")
+	}
+
+	c := cfg{}
+	if err := UnmarshalArgs(&c, []string{"app", "x"}); err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+}
+
+// TestInvalidModifierPanics covers an unknown modifier: it is a struct
+// definition error, so Unmarshal panics (developer's mistake).
+func TestInvalidModifierPanics(t *testing.T) {
+	defer func() {
+		if recover() == nil {
+			t.Error("expected a panic for an unknown modifier")
+		}
+	}()
+
+	UnmarshalArgs(&struct {
+		X int `opt:"x,bogus"`
+	}{}, []string{"app"})
+}
+
+// TestDuration covers time.Duration fields parsed from human-readable forms.
+func TestDuration(t *testing.T) {
+	type cfg struct {
+		Timeout time.Duration `opt:"timeout" alt:"t"`
+	}
+
+	c := cfg{}
+	if err := UnmarshalArgs(&c, []string{"app", "--timeout", "1h30m"}); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if want := 90 * time.Minute; c.Timeout != want {
+		t.Errorf("expected %v, got %v", want, c.Timeout)
+	}
+
+	// An invalid duration is an error.
+	if err := UnmarshalArgs(&cfg{}, []string{"app", "-t", "nope"}); err == nil {
+		t.Error("expected an error for an invalid duration")
+	}
+}
+
+// TestStrictBoolValue covers BUG-11: a non-boolean value for a boolean
+// option (e.g. --debug=2) is an error, not silently true.
+func TestStrictBoolValue(t *testing.T) {
+	type cfg struct {
+		Debug bool `opt:"debug" alt:"d"`
+	}
+
+	if err := UnmarshalArgs(&cfg{}, []string{"app", "--debug=2"}); err == nil {
+		t.Error("expected an error for --debug=2")
+	}
+
+	c := cfg{}
+	if err := UnmarshalArgs(&c, []string{"app", "--debug=true"}); err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	if !c.Debug {
+		t.Error("expected Debug=true")
 	}
 }
 

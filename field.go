@@ -100,6 +100,7 @@ type tagGroup struct {
 	helpMsg   string // help information about field
 	sepList   string // list delimiter for defValue
 	isIgnored bool   // true if ignore the field
+	required  bool   // true if the option must be provided
 }
 
 // The fieldCast is field data structure.
@@ -255,6 +256,26 @@ func getTagGroup(
 		defValue: defTagValue,
 		sepList:  sepTagValue,
 		helpMsg:  helpTagValue,
+	}
+
+	// Split the opt tag into the option name and optional comma-separated
+	// modifiers, e.g. opt:"host,required" -> name "host", modifier
+	// "required" (the same convention as encoding/json and goloop/env).
+	if i := strings.IndexByte(optTagValue, ','); i >= 0 {
+		mods := optTagValue[i+1:]
+		optTagValue = strings.TrimSpace(optTagValue[:i])
+		for _, mod := range strings.Split(mods, ",") {
+			switch strings.TrimSpace(mod) {
+			case "required":
+				tg.required = true
+			case "":
+				// Tolerate empty modifiers, e.g. opt:"host,".
+			default:
+				return tg, fmt.Errorf(
+					"invalid %s tag modifier %s", tagNameOpt, mod,
+				)
+			}
+		}
 	}
 
 	// The fieldName must be used for an empty value of optTagValue.

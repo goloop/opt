@@ -24,10 +24,10 @@ The module supports parsing of different types of data, positional arguments, ar
 
 ```shell
 ./app -H 0.0.0.0 --port=80 --no-verbose -U goloop.one -dc a.yaml,b.yaml 5 10 15
-./app 5 --host 0.0.0.0 -p 80 --verbose false -U goloop.one -c a.yaml -c b.yaml -d -- 10 15
+./app 5 --host 0.0.0.0 -p 80 --no-verbose -U goloop.one -c a.yaml -c b.yaml -d -- 10 15
 ./app 5 10 -c a.yaml -p 80 --host=0.0.0.0 --no-verbose -dU goloop.one -c b.yaml 15
 ./app 5 10 15 -c a.yaml,b.yaml -p 80 --host=0.0.0.0 --no-verbose -dU goloop.one
-./app 5 10 15 -c a.yaml,b.yaml -p 80 -H 0.0.0.0 --verbose=false -d true -U goloop.one
+./app 5 10 15 -c a.yaml,b.yaml -p 80 -H 0.0.0.0 --verbose=false -d -U goloop.one
 ./app -c a.yaml,b.yaml -p 80 -H 0.0.0.0 --no-verbose -dU goloop.one 5 10 15
 ./app 5 --verbose=false -c a.yaml -c b.yaml -p 80 -H 0.0.0.0 -dU goloop.one 10 15
 ```
@@ -143,9 +143,9 @@ After prefix from two dashes there should be no spaces, for example `--host` is 
 
 If flag has value it must be written after the equal sign `=` or after the space, for example: `--host=localhost` and `--host localhost` the same. Value from a few words separated by a space should be enclosed in quotation marks, for example: `--user="Smith J."` or `--user "Smith J."`.
 
-The flag can be used as a sweater, in this case, it is assumed that its absence in the command line this flag contains a false value (but it is not required, and depends on the default value specified in the program). The switch can be prefixed `no-`, which sets the value to false.
+A boolean flag is a switch: writing `--verbose` (or `-v`) sets it to true and it never consumes the next argument (just like a no-argument option in `getopt`). Its absence leaves the default value (false unless `def` says otherwise). To set it to false explicitly, use the `no-` prefix or the `=` form.
 
-For example, for `--verbose` flag: `--verbose true` and `--verbose` the same; `--verbose false` and `--no-verbose` the same too.
+For example, for the `--verbose` flag: `--verbose` and `-v` set it to true; `--no-verbose`, `--verbose=false` and `-v=false` set it to false. A following token is never taken as the value, so `--verbose false` sets verbose to true and leaves `false` as a positional argument.
 
 The sequence of flags does not create problems, so the following arguments will give the same result:
 
@@ -154,12 +154,12 @@ The sequence of flags does not create problems, so the following arguments will 
 ./app -dU Jack -U Bob --USER=Roy --No-Verbose -g "L R" 5 10 15
 ./app -d -UJack -U Bob -URoy --no-verbose -g"L R" 5 10 15
 ./app -g "L R" -U Jack -UBob -URoy --no-verbose -d -- 5 10 15
-./app 5 -dU Jack --user Bob -URoy --verbose false -g"L R" 10 15
+./app 5 -dU Jack --user Bob -URoy --no-verbose -g"L R" 10 15
 ./app 5 10 --no-verboSe -dU Jack -U Bob -U Roy -g "L R" 15
 ./app 5 10 15 -UJack -UBob -URoy --verbose=false -g "L R" -d
-./app 5 10 15 -U Jack -UBob -URoy -d --VERBOSE false -g"L R"
-./app 5 -UJack --no-verbose -g"L R" -UBob -d true -URoy 10 15
-./app 5 -UJack -UBob --verbose false -URoy -g"L R" -d -- 10 15
+./app 5 10 15 -U Jack -UBob -URoy -d --no-verbose -g"L R"
+./app 5 -UJack --no-verbose -g"L R" -UBob -d -URoy 10 15
+./app 5 -UJack -UBob --no-verbose -URoy -g"L R" -d -- 10 15
 ```
 
 ### Short flags
@@ -172,9 +172,9 @@ After prefix from one dash there should be no spaces, for example `-h` is correc
 
 If flag has value it must be written after the space or without separating the value from the flag, for example: `-p 8080` and `-p8080` the same. Value from a few words separated by a space should be enclosed in quotation marks, for example: `-u "Smith J."` or `-u"Smith J."`.
 
-The flag can be used as a sweater, in this case, it is assumed that its absence in the command line this flag contains a false value.
+A short boolean flag is a switch too: its absence leaves the default value (false unless `def` says otherwise), and it never consumes the next argument.
 
-For example, for `-v` flag: `-v true` and `-v` the same; `-v false` to set the value to false.
+For example, for the `-v` flag: `-v` sets it to true; `-v=false` sets it to false. As with long flags, `-v false` sets it to true and leaves `false` as a positional argument.
 
 Short flags can be grouped. For example for flags `-v`,` -d`, `-p` where the latter has the value` 8080` can be written as `-vdp8080` or` -dvp 8080` or `-vd -p 8080` or` -vp8080 - etc.
 
@@ -315,7 +315,7 @@ fmt.Println("AgeList:", args.AgeList)
 //  Port: 8080
 //  Verbose: true
 //  UserList: [John Bob Roy]
-//  AgeList: [10 20 30]
+//  AgeList: [23 25 27]
 ```
 
 To pass the list, you can use the flag for each new argument or write them through the separator specified in the sep tag.
@@ -460,17 +460,17 @@ case args.Help:
 
 #### func  Unmarshal
 
-    func Unmarshal(obj interface{}) error
+    func Unmarshal(obj any) error
 
-Unmarshal parses the argument-line options and stores the result to go-struct.
-If the obj isn't a pointer to struct or is nil - returns an error.
+Unmarshal parses the argument-line options (os.Args) and stores the result to
+go-struct. If the obj isn't a pointer to struct or is nil - returns an error.
 
 Unmarshal method supports the following field's types: int, int8, int16, int32,
-int64, uin, uint8, uin16, uint32, in64, float32, float64, string, bool, url.URL
-and pointers, array or slice from thous types (i.e. *int, ..., []int, ...,
-[]bool, ..., [2]*url.URL, etc.).
+int64, uint, uint8, uint16, uint32, uint64, float32, float64, string, bool,
+time.Duration, url.URL and pointers, array or slice from those types (i.e.
+*int, ..., []int, ..., []bool, ..., [2]*url.URL, etc.).
 
-For other filed's types (like chan, map ...) will be returned an error.
+For other field's types (like chan, map ...) will be returned an error.
 
 The function generates a panic if:
 
@@ -480,16 +480,21 @@ positional arguments `opt:"[]"` is not a list (slice/array); - field has
 structure type (except url.URL); - field has pointer to structure type (except
 *url.URL).
 
-Use the following tags in the fields of structure to set the marshing
+Use the following tags in the fields of structure to set the marshalling
 parameters:
 
-    opt  indicates a short or long option;
+    opt  indicates a short or long option; it may be followed by
+         comma-separated modifiers, e.g. opt:"host,required";
     alt  optional, alternative option for position opt,
          if a long option is specified in opt, a short option
          can be specified in alt or vice versa;
     def  default value (if empty, sets the default value
          for the field type of structure);
+    sep  delimiter used to split a list value;
     help brief help about the option.
+
+The only modifier currently supported is `required`: the option must be
+present on the command line, otherwise Unmarshal returns an error.
 
 Suppose that the some values was set into argument-line as:
 
@@ -516,8 +521,14 @@ Unmarshal data from the argument-line into Args struct.
     //  Host: 0.0.0.0
     //  Port: 8080
 
-#### func  Version
+#### func  UnmarshalArgs
 
-    func Version() string
+    func UnmarshalArgs(obj any, args []string) error
 
-Version returns the version of the module.
+UnmarshalArgs is like Unmarshal but parses the given argument list instead of
+os.Args. The first element is treated as the program path (os.Args[0]), so pass
+it the same shape as os.Args, e.g.:
+
+    err := opt.UnmarshalArgs(&cfg, []string{"app", "--host", "x", "-p", "80"})
+
+This is convenient for tests, sub-commands and REPLs.

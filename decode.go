@@ -7,7 +7,12 @@ import (
 	"reflect"
 	"strconv"
 	"strings"
+	"time"
 )
+
+// durationType is the reflect.Type of time.Duration, used to accept
+// human-readable durations like "30s" or "1h30m" for such fields.
+var durationType = reflect.TypeOf(time.Duration(0))
 
 // unmarshalOpt parses variables from the command-line and sets them into
 // fields of object.
@@ -69,8 +74,9 @@ func unmarshalOpt(obj any, args []string) []error {
 		arg := fc.tagGroup.shortFlag + fc.tagGroup.longFlag
 
 		value, kind, ok := []string{}, fc.item.Kind(), false
-		switch f := fc.tagGroup.shortFlag; {
-		case f == "[]":
+		isPositional := fc.tagGroup.shortFlag == "[]"
+		switch {
+		case isPositional:
 			// Get positional arguments.
 			value = am.posValues()
 		default:
@@ -88,6 +94,16 @@ func unmarshalOpt(obj any, args []string) []error {
 				if kind != reflect.Array && kind != reflect.Slice {
 					value = []string{value[len(value)-1]}
 				}
+			}
+		}
+
+		// A required option must be present on the command line. For a
+		// positional list that means at least one positional argument.
+		if fc.tagGroup.required {
+			provided := ok || (isPositional && len(value) > 0)
+			if !provided {
+				errs = append(errs, fmt.Errorf("%s is required", arg))
+				continue
 			}
 		}
 
@@ -202,6 +218,23 @@ func setValue(item reflect.Value, value string) (err error) {
 	}()
 
 	kind := item.Kind()
+
+	// time.Duration is an int64; accept human-readable forms like "30s",
+	// "1h30m". An empty value resets it to zero.
+	if kind == reflect.Int64 && item.Type() == durationType {
+		if value == "" {
+			item.SetInt(0)
+			return nil
+		}
+
+		d, err := time.ParseDuration(value)
+		if err != nil {
+			return fmt.Errorf("'%v' is incorrect duration", value)
+		}
+
+		item.SetInt(int64(d))
+		return nil
+	}
 
 	switch kind {
 	case reflect.Int, reflect.Int8, reflect.Int16,
@@ -388,29 +421,21 @@ func strToFloatKind(value string, kind reflect.Kind) (r float64, err error) {
 	return
 }
 
-// strToBool convert string to bool type. Returns: result, error.
-// Returns default value for bool type if value is empty.
+// strToBool converts string to bool type. An empty string yields false.
+// Only the literals accepted by strconv.ParseBool are valid: 1, t, T, TRUE,
+// true, True, 0, f, F, FALSE, false, False.
 func strToBool(value string) (bool, error) {
-	epsilon := math.Nextafter(1, 2) - 1
-
 	// For empty string returns false.
 	if len(value) == 0 {
 		return false, nil
 	}
 
-	r, errB := strconv.ParseBool(value)
-	if errB != nil {
-		f, errF := strconv.ParseFloat(value, 64)
-		if errF != nil {
-			return r, fmt.Errorf(
-				"'%v' has incorrect type, bool expected",
-				value,
-			)
-		}
-
-		if math.Abs(f) > epsilon {
-			r = true
-		}
+	r, err := strconv.ParseBool(value)
+	if err != nil {
+		return false, fmt.Errorf(
+			"'%v' has incorrect type, bool expected",
+			value,
+		)
 	}
 
 	return r, nil

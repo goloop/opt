@@ -26,7 +26,7 @@ import (
 // - field has pointer to structure type (except *url.URL).
 //
 // Use the following tags in the fields of structure to
-// set the marshing parameters:
+// set the marshalling parameters:
 //
 //	opt  indicates a short or long option;
 //	alt  optional, alternative option for position opt,
@@ -61,7 +61,18 @@ import (
 //	//  Host: 0.0.0.0
 //	//  Port: 8080
 func Unmarshal(obj any) error {
+	return UnmarshalArgs(obj, os.Args)
+}
+
+// UnmarshalArgs is like Unmarshal but parses the given argument list instead
+// of os.Args. The first element is treated as the program path (os.Args[0]),
+// so pass it the same shape as os.Args, e.g.:
+//
+//	err := opt.UnmarshalArgs(&cfg, []string{"app", "--host", "x", "-p", "80"})
+//
+// This is convenient for tests, sub-commands and REPLs.
+func UnmarshalArgs(obj any, args []string) error {
 	// Join all collected errors so the caller sees every problem at once
 	// (errors.Join returns nil for an empty/all-nil slice).
-	return errors.Join(unmarshalOpt(obj, os.Args)...)
+	return errors.Join(unmarshalOpt(obj, args)...)
 }
