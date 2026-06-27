@@ -4,6 +4,7 @@ import (
 	"net/url"
 	"reflect"
 	"testing"
+	"time"
 )
 
 // Test structures
@@ -15,14 +16,15 @@ type simpleArgs struct {
 }
 
 type complexArgs struct {
-	Host      string   `opt:"H" alt:"host" def:"localhost" help:"host of the server"`
-	Port      int      `opt:"port" alt:"p" def:"8080" help:"port of the server"`
-	Debug     bool     `opt:"d" help:"debug mode"`
-	Verbose   bool     `opt:"verbose" help:"enable verbose mode"`
-	Configs   []string `opt:"c" sep:","`
-	ServerURL url.URL  `opt:"U" help:"URL to the server"`
-	Doc       string   `opt:"?"`
-	Pos       []int    `opt:"[]"`
+	Host      string        `opt:"H,required" alt:"host" def:"localhost" help:"host of the server"`
+	Port      int           `opt:"port" alt:"p" def:"8080" help:"port of the server"`
+	Debug     bool          `opt:"d" help:"debug mode"`
+	Verbose   bool          `opt:"verbose" help:"enable verbose mode"`
+	Timeout   time.Duration `opt:"timeout" alt:"t" help:"request timeout"`
+	Configs   []string      `opt:"c" sep:","`
+	ServerURL url.URL       `opt:"U" help:"URL to the server"`
+	Doc       string        `opt:"?"`
+	Pos       []int         `opt:"[]"`
 }
 
 var (
@@ -88,12 +90,12 @@ func BenchmarkUnmarshalSimple(b *testing.B) {
 		"--verbose=false",
 	}
 
-	var cfg simpleArgs
+	b.ReportAllocs()
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		errs := unmarshalOpt(&cfg, args)
-		if errs != nil {
-			b.Fatal(errs[0])
+		var cfg simpleArgs
+		if err := UnmarshalArgs(&cfg, args); err != nil {
+			b.Fatal(err)
 		}
 	}
 }
@@ -105,6 +107,7 @@ func BenchmarkUnmarshalComplex(b *testing.B) {
 		"--port=8080",
 		"-d",
 		"--verbose=false",
+		"--timeout", "30s",
 		"-c", "config1.yaml,config2.yaml",
 		"-U", "http://localhost:8080",
 		"10",
@@ -112,12 +115,12 @@ func BenchmarkUnmarshalComplex(b *testing.B) {
 		"30",
 	}
 
-	var cfg complexArgs
+	b.ReportAllocs()
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		errs := unmarshalOpt(&cfg, args)
-		if errs != nil {
-			b.Fatal(errs[0])
+		var cfg complexArgs
+		if err := UnmarshalArgs(&cfg, args); err != nil {
+			b.Fatal(err)
 		}
 	}
 }
@@ -164,6 +167,9 @@ func BenchmarkSetValue(b *testing.B) {
 	var bl bool
 	boolVal := reflect.ValueOf(&bl).Elem()
 
+	var dur time.Duration
+	durVal := reflect.ValueOf(&dur).Elem()
+
 	b.Run("String", func(b *testing.B) {
 		for i := 0; i < b.N; i++ {
 			benchResult = setValue(strVal, "test")
@@ -179,6 +185,12 @@ func BenchmarkSetValue(b *testing.B) {
 	b.Run("Bool", func(b *testing.B) {
 		for i := 0; i < b.N; i++ {
 			benchResult = setValue(boolVal, "true")
+		}
+	})
+
+	b.Run("Duration", func(b *testing.B) {
+		for i := 0; i < b.N; i++ {
+			benchResult = setValue(durVal, "1h30m")
 		}
 	})
 }
