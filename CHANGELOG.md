@@ -4,6 +4,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.1.0] - 2026-06-27
+
+### Performance
+- Cache the parsed struct specification (field tags, validation and the
+  flag maps) per type, so the reflection and tag parsing run once per struct
+  type instead of on every call. Repeated parsing of the same type is ~50%
+  faster on small structs with fewer allocations; no API or behaviour change.
+
 ## [2.0.0] - 2026-06-27
 
 ### Changed (breaking)

@@ -6,6 +6,7 @@ import (
 	"net/url"
 	"reflect"
 	"strings"
+	"sync"
 	"unicode/utf8"
 
 	"github.com/goloop/scs"
@@ -174,22 +175,28 @@ func validateStruct(obj any) (reflect.Type, reflect.Value, error) {
 	return rt, rv, err
 }
 
-// The getFieldCastList parses the structure fields and
-// returns list of the fieldCast.
-func getFieldCastList(obj any) (fieldCastList, error) {
-	var result fieldCastList
+// The fieldSpec is the type-invariant description of a single struct field:
+// its index, name and parsed tag group. It carries no instance data, so it
+// can be cached and reused across calls for the same struct type.
+type fieldSpec struct {
+	index    int
+	name     string
+	tagGroup tagGroup
+}
 
-	// Check object type.
-	rt, rv, err := validateStruct(obj)
-	if err != nil {
-		return result, err
-	}
+// specCache memoizes the parsed []fieldSpec per struct reflect.Type, so the
+// reflection, tag parsing and type validation run once per type rather than
+// on every Unmarshal/UnmarshalArgs call.
+var specCache sync.Map // map[reflect.Type][]fieldSpec
 
-	elem := rv.Elem()
+// buildFieldSpecs parses and validates the fields of the struct type st and
+// returns their type-invariant specs. It does not touch any instance value.
+func buildFieldSpecs(st reflect.Type) ([]fieldSpec, error) {
+	var result []fieldSpec
+
 	urlS, urlP := reflect.TypeOf(url.URL{}), reflect.TypeOf((*url.URL)(nil))
-	for i := 0; i < elem.NumField(); i++ {
-		// Get tag data from the field.
-		field := rt.Elem().Field(i)
+	for i := 0; i < st.NumField(); i++ {
+		field := st.Field(i)
 
 		// Get tag group.
 		//
@@ -206,40 +213,87 @@ func getFieldCastList(obj any) (fieldCastList, error) {
 		)
 
 		if err != nil {
-			return result, err
+			return nil, err
 		} else if tg.isIgnored {
 			continue
 		}
 
-		// Collect fields for further analysis.
-		item := elem.FieldByName(field.Name)
-		fc := fieldCast{fieldName: field.Name, tagGroup: &tg, item: &item}
-
-		kind := fc.item.Kind()
-		switch f := fc.tagGroup.shortFlag; {
+		// Validate the field type against the tag.
+		ft := field.Type
+		kind := ft.Kind()
+		switch f := tg.shortFlag; {
 		case f == "?" && kind != reflect.String:
 			// To load doc, the field must be of the string type.
-			err = fmt.Errorf("%s field should be a string", fc.fieldName)
+			err = fmt.Errorf("%s field should be a string", field.Name)
 		case f == "[]" && kind != reflect.Array && kind != reflect.Slice:
 			// To load positional arguments,
 			// the field must be of the slice type.
-			err = fmt.Errorf("%s field should be a list", fc.fieldName)
-		case kind == reflect.Struct && fc.item.Type() != urlS:
+			err = fmt.Errorf("%s field should be a list", field.Name)
+		case kind == reflect.Struct && ft != urlS:
 			// Supported url.URL struct only.
-			err = fmt.Errorf("%s field has invalid type", fc.fieldName)
+			err = fmt.Errorf("%s field has invalid type", field.Name)
 		case kind == reflect.Ptr:
 			// Pointer to the structure *url.URL only.
-			k, t := fc.item.Type().Elem().Kind(), fc.item.Type()
-			if k == reflect.Struct && t != urlP {
-				err = fmt.Errorf("%s field has invalid type", fc.fieldName)
+			if ft.Elem().Kind() == reflect.Struct && ft != urlP {
+				err = fmt.Errorf("%s field has invalid type", field.Name)
 			}
 		}
 
 		if err != nil {
-			return result, err
+			return nil, err
 		}
 
-		result = append(result, &fc)
+		result = append(result, fieldSpec{
+			index:    i,
+			name:     field.Name,
+			tagGroup: tg,
+		})
+	}
+
+	return result, nil
+}
+
+// cachedFieldSpecs returns the (memoized) field specs for the struct type st.
+func cachedFieldSpecs(st reflect.Type) ([]fieldSpec, error) {
+	if v, ok := specCache.Load(st); ok {
+		return v.([]fieldSpec), nil
+	}
+
+	specs, err := buildFieldSpecs(st)
+	if err != nil {
+		return nil, err
+	}
+
+	specCache.Store(st, specs)
+	return specs, nil
+}
+
+// The getFieldCastList returns the list of fieldCast for the given object,
+// binding each cached field spec to the corresponding field of this instance.
+// The tag parsing and validation are done once per type via cachedFieldSpecs.
+func getFieldCastList(obj any) (fieldCastList, error) {
+	// Check object type.
+	rt, rv, err := validateStruct(obj)
+	if err != nil {
+		return nil, err
+	}
+
+	specs, err := cachedFieldSpecs(rt.Elem())
+	if err != nil {
+		return nil, err
+	}
+
+	// Bind the cached specs to this instance's field values.
+	elem := rv.Elem()
+	result := make(fieldCastList, len(specs))
+	for i := range specs {
+		spec := &specs[i]
+		item := elem.Field(spec.index)
+		result[i] = &fieldCast{
+			fieldName: spec.name,
+			tagGroup:  &spec.tagGroup,
+			item:      &item,
+		}
 	}
 
 	return result, nil

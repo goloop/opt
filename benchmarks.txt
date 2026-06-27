@@ -1,15 +1,15 @@
 goos: linux
 goarch: arm64
 pkg: github.com/goloop/opt/v2
-BenchmarkParseArgMap-8          	 3560611	       362.0 ns/op	     136 B/op	       7 allocs/op
-BenchmarkParseArgMapComplex-8   	 1203602	       996.9 ns/op	    1036 B/op	      17 allocs/op
-BenchmarkUnmarshalSimple-8      	  411780	      2786 ns/op	     992 B/op	      33 allocs/op
-BenchmarkUnmarshalComplex-8     	   76936	     15859 ns/op	    9997 B/op	     238 allocs/op
-BenchmarkGetTagGroup/Simple-8   	20906287	        57.04 ns/op	      96 B/op	       1 allocs/op
-BenchmarkGetTagGroup/WithSeparator-8         	23285559	        55.24 ns/op	      96 B/op	       1 allocs/op
-BenchmarkSetValue/String-8                   	151631060	         7.852 ns/op	       0 B/op	       0 allocs/op
-BenchmarkSetValue/Int64-8                    	43147876	        27.00 ns/op	       0 B/op	       0 allocs/op
-BenchmarkSetValue/Bool-8                     	100000000	        10.52 ns/op	       0 B/op	       0 allocs/op
-BenchmarkSetValue/Duration-8                 	24076844	        48.88 ns/op	       0 B/op	       0 allocs/op
+BenchmarkParseArgMap-8          	 3233461	       320.0 ns/op	     136 B/op	       7 allocs/op
+BenchmarkParseArgMapComplex-8   	 1264587	       968.2 ns/op	    1036 B/op	      17 allocs/op
+BenchmarkUnmarshalSimple-8      	  916869	      1319 ns/op	     584 B/op	      27 allocs/op
+BenchmarkUnmarshalComplex-8     	   94246	     12209 ns/op	    8948 B/op	     224 allocs/op
+BenchmarkGetTagGroup/Simple-8   	22385588	        55.49 ns/op	      96 B/op	       1 allocs/op
+BenchmarkGetTagGroup/WithSeparator-8         	24559338	        49.32 ns/op	      96 B/op	       1 allocs/op
+BenchmarkSetValue/String-8                   	149581141	         8.002 ns/op	       0 B/op	       0 allocs/op
+BenchmarkSetValue/Int64-8                    	44972032	        27.36 ns/op	       0 B/op	       0 allocs/op
+BenchmarkSetValue/Bool-8                     	100000000	        10.48 ns/op	       0 B/op	       0 allocs/op
+BenchmarkSetValue/Duration-8                 	24630942	        48.89 ns/op	       0 B/op	       0 allocs/op
 PASS
-ok  	github.com/goloop/opt/v2	14.480s
+ok  	github.com/goloop/opt/v2	14.256s
