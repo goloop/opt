@@ -192,10 +192,14 @@ func getFieldCastList(obj any) (fieldCastList, error) {
 		field := rt.Elem().Field(i)
 
 		// Get tag group.
+		//
+		// Trim only spaces, not dashes: a lone "-" is the ignore marker,
+		// and trimming dashes would turn it into an empty value (which then
+		// falls back to the field name and makes the field a normal flag).
 		tg, err := getTagGroup(
 			field.Name,
-			strings.Trim(field.Tag.Get(tagNameOpt), " -"),
-			strings.Trim(field.Tag.Get(tagNameAlt), " -"),
+			strings.TrimSpace(field.Tag.Get(tagNameOpt)),
+			strings.TrimSpace(field.Tag.Get(tagNameAlt)),
 			field.Tag.Get(tagNameDefValue),
 			field.Tag.Get(tagNameSepList),
 			field.Tag.Get(tagNameHelpMsg),

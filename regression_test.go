@@ -1,7 +1,6 @@
 package opt
 
 import (
-	"os"
 	"reflect"
 	"strings"
 	"testing"
@@ -36,9 +35,8 @@ func TestNegativeNumberValue(t *testing.T) {
 	}
 
 	for i, test := range tests {
-		os.Args = test.args
 		a := edgeArgs{}
-		if err := Unmarshal(&a); err != nil {
+		if err := UnmarshalArgs(&a, test.args); err != nil {
 			t.Errorf("%d: unexpected error: %v", i, err)
 			continue
 		}
@@ -58,9 +56,8 @@ func TestNegativeNumberValue(t *testing.T) {
 // TestShortFlagEquals covers BUG-02: a short option may receive its value via
 // "=" (e.g. "-p=80"), symmetrically with the long form "--port=80".
 func TestShortFlagEquals(t *testing.T) {
-	os.Args = []string{"./app", "-p=80"}
 	a := edgeArgs{}
-	if err := Unmarshal(&a); err != nil {
+	if err := UnmarshalArgs(&a, []string{"./app", "-p=80"}); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
@@ -72,9 +69,8 @@ func TestShortFlagEquals(t *testing.T) {
 // TestNegativePositional covers BUG-03: a negative number passed as a
 // positional argument must be kept as a value, not parsed as a flag.
 func TestNegativePositional(t *testing.T) {
-	os.Args = []string{"./app", "-5", "10"}
 	a := edgeArgs{}
-	if err := Unmarshal(&a); err != nil {
+	if err := UnmarshalArgs(&a, []string{"./app", "-5", "10"}); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
@@ -87,13 +83,12 @@ func TestNegativePositional(t *testing.T) {
 // TestLongFlagZeroDigit covers BUG-06: a long option name may contain the
 // digit 0 (e.g. "ipv0", "mode0") without panicking.
 func TestLongFlagZeroDigit(t *testing.T) {
-	os.Args = []string{"./app", "--ipv0", "test"}
 	a := struct {
 		IPv0 string `opt:"ipv0"`
 		Mode string `opt:"mode0"`
 	}{}
 
-	if err := Unmarshal(&a); err != nil {
+	if err := UnmarshalArgs(&a, []string{"./app", "--ipv0", "test"}); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
@@ -123,9 +118,8 @@ func TestOptionSortShortOnly(t *testing.T) {
 // TestEmptyEqualsValue covers BUG-04: "--flag=" with an explicitly empty
 // value means empty/zero, not the "true" switch and not the next token.
 func TestEmptyEqualsValue(t *testing.T) {
-	os.Args = []string{"./app", "--port=", "10"}
 	a := edgeArgs{}
-	if err := Unmarshal(&a); err != nil {
+	if err := UnmarshalArgs(&a, []string{"./app", "--port=", "10"}); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
@@ -165,9 +159,8 @@ func TestBoolDoesNotEatPositional(t *testing.T) {
 	}
 
 	for i, test := range tests {
-		os.Args = test.args
 		a := boolArgs{}
-		if err := Unmarshal(&a); err != nil {
+		if err := UnmarshalArgs(&a, test.args); err != nil {
 			t.Errorf("%d: unexpected error: %v", i, err)
 			continue
 		}
@@ -208,13 +201,12 @@ func TestPositionalHelpNumericSort(t *testing.T) {
 // TestUnmarshalJoinsErrors covers BUG-09: Unmarshal reports every error,
 // not just the first one.
 func TestUnmarshalJoinsErrors(t *testing.T) {
-	os.Args = []string{"./app", "-a", "notnum", "-b", "alsonot"}
 	a := struct {
 		A int `opt:"a"`
 		B int `opt:"b"`
 	}{}
 
-	err := Unmarshal(&a)
+	err := UnmarshalArgs(&a, []string{"./app", "-a", "notnum", "-b", "alsonot"})
 	if err == nil {
 		t.Fatal("expected an error")
 	}
@@ -229,11 +221,10 @@ func TestUnmarshalJoinsErrors(t *testing.T) {
 // fewer values than its size leave the rest at zero (previously the whole
 // array was silently zeroed), while more values than its size overflow.
 func TestArrayPartialFill(t *testing.T) {
-	os.Args = []string{"./app", "1", "2", "3"}
 	a := struct {
 		Pos [8]int `opt:"[]"`
 	}{}
-	if err := Unmarshal(&a); err != nil {
+	if err := UnmarshalArgs(&a, []string{"./app", "1", "2", "3"}); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
@@ -242,11 +233,10 @@ func TestArrayPartialFill(t *testing.T) {
 	}
 
 	// More values than the array size is an overflow error.
-	os.Args = []string{"./app", "1", "2", "3", "4"}
 	b := struct {
 		Pos [3]int `opt:"[]"`
 	}{}
-	if err := Unmarshal(&b); err == nil {
+	if err := UnmarshalArgs(&b, []string{"./app", "1", "2", "3", "4"}); err == nil {
 		t.Error("expected an overflow error")
 	}
 }
@@ -361,6 +351,33 @@ func TestStrictBoolValue(t *testing.T) {
 	}
 	if !c.Debug {
 		t.Error("expected Debug=true")
+	}
+}
+
+// TestIgnoreMarker covers BUG-13: a field tagged opt:"-" is ignored entirely
+// and is not exposed as a flag derived from its name.
+func TestIgnoreMarker(t *testing.T) {
+	type cfg struct {
+		Ignored bool   `opt:"-"`
+		Host    string `opt:"host"`
+	}
+
+	// --ignored is not a declared flag, so it is an error.
+	bad := cfg{}
+	if err := UnmarshalArgs(&bad, []string{"app", "--ignored"}); err == nil {
+		t.Error("expected an error: opt:\"-\" must not create a flag")
+	}
+	if bad.Ignored {
+		t.Error("opt:\"-\" field must not be settable")
+	}
+
+	// Other fields still work while the ignored one is skipped.
+	ok := cfg{}
+	if err := UnmarshalArgs(&ok, []string{"app", "--host", "x"}); err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	if ok.Host != "x" {
+		t.Errorf("expected Host=x, got %q", ok.Host)
 	}
 }
 

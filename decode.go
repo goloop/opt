@@ -69,9 +69,8 @@ func unmarshalOpt(obj any, args []string) []error {
 			continue
 		}
 
-		// Name of the option for error messages: the short and long
-		// flags joined (either may be empty), e.g. "U", "users", "Uusers".
-		arg := fc.tagGroup.shortFlag + fc.tagGroup.longFlag
+		// Name of the option for error messages, e.g. "-p/--port".
+		arg := optName(fc.tagGroup.shortFlag, fc.tagGroup.longFlag)
 
 		value, kind, ok := []string{}, fc.item.Kind(), false
 		isPositional := fc.tagGroup.shortFlag == "[]"
@@ -170,6 +169,25 @@ func unmarshalOpt(obj any, args []string) []error {
 	}
 
 	return errs
+}
+
+// optName formats an option's display name for error messages, e.g.
+// "-p/--port", "--host", "-h", "argument #1" or "positional arguments".
+func optName(short, long string) string {
+	switch {
+	case short == "[]":
+		return "positional arguments"
+	case isOrderFlag(short):
+		return "argument #" + short
+	case short != "" && long != "":
+		return "-" + short + "/--" + long
+	case long != "":
+		return "--" + long
+	case short != "":
+		return "-" + short
+	default:
+		return ""
+	}
 }
 
 // splitValues splits every element of values by sep and returns the

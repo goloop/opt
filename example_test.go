@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/goloop/opt"
+	"github.com/goloop/opt/v2"
 )
 
 // Parse a typical set of options from an explicit argument slice.

@@ -59,9 +59,8 @@ func TestLongFlags(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		os.Args = test.Args
 		args := testArgs{}
-		if err := Unmarshal(&args); err != nil {
+		if err := UnmarshalArgs(&args, test.Args); err != nil {
 			t.Error(err)
 		}
 
@@ -112,8 +111,7 @@ func TestShortFlags(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		os.Args = test.Args
-		if err := Unmarshal(&args); err != nil {
+		if err := UnmarshalArgs(&args, test.Args); err != nil {
 			t.Error(err)
 		}
 
@@ -133,8 +131,27 @@ func TestUnmarshalErrors(t *testing.T) {
 		Host string
 	}{}
 
-	os.Args = []string{"./apt", "-d", "-p"} // flags d and p doesn't exist
-	if err := Unmarshal(&args); err == nil {
+	// Flags d and p are not declared.
+	err := UnmarshalArgs(&args, []string{"./apt", "-d", "-p"})
+	if err == nil {
 		t.Error("expected an error")
+	}
+}
+
+// TestUnmarshalUsesOsArgs checks that Unmarshal reads os.Args. It restores
+// os.Args afterwards so it does not interfere with other tests or fuzzing
+// (which re-execs the test binary via os.Args[0]).
+func TestUnmarshalUsesOsArgs(t *testing.T) {
+	saved := os.Args
+	defer func() { os.Args = saved }()
+
+	os.Args = []string{"./app", "--host", "0.0.0.0", "-p", "80"}
+	args := testArgs{}
+	if err := Unmarshal(&args); err != nil {
+		t.Fatal(err)
+	}
+
+	if args.Host != "0.0.0.0" || args.Port != 80 {
+		t.Errorf("got host=%q port=%d", args.Host, args.Port)
 	}
 }

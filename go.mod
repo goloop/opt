@@ -1,4 +1,4 @@
-module github.com/goloop/opt
+module github.com/goloop/opt/v2
 
 go 1.24
 

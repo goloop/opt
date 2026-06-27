@@ -264,26 +264,22 @@ func (am argMap) asFlat() map[string][]string {
 // The posValues returns values of positional arguments
 // sorted in the sequence specified in the command line.
 func (am argMap) posValues() []string {
-	// Position argument object for sorting.
+	// Position argument object for sorting. A positional argument always
+	// has exactly one value, e.g. "./app one two" -> "1": ["one"], etc.
 	type posItem struct {
-		order int      // real index of the positional argument
-		value []string // value of the posipositionaltion argument
+		order int    // real index of the positional argument
+		value string // value of the positional argument
 	}
 
 	// Filter positional arguments only
 	// (such arguments have a key that can be converted to an integer).
-	tmp := []posItem{}
+	tmp := make([]posItem, 0, len(am))
 	for key, items := range am {
-		if order, err := strconv.Atoi(key); err == nil {
-			if order == 0 {
-				continue // name of app
-			}
-			value := make([]string, 0, len(items))
-			for _, item := range items {
-				value = append(value, item.value)
-			}
-			tmp = append(tmp, posItem{order, value})
+		order, err := strconv.Atoi(key)
+		if err != nil || order == 0 || len(items) == 0 {
+			continue // not a positional, or the app path ("0")
 		}
+		tmp = append(tmp, posItem{order, items[0].value})
 	}
 
 	// Arrange the items in the order specified in the command line.
@@ -292,11 +288,9 @@ func (am argMap) posValues() []string {
 	})
 
 	// Return only the values of these arguments.
-	result := make([]string, 0, len(tmp))
-	for _, item := range tmp {
-		// A positional argument always has exactly one value, e.g.
-		// "./app one two three" -> "0": ["./app"], "1": ["one"], etc.
-		result = append(result, item.value[0])
+	result := make([]string, len(tmp))
+	for i, item := range tmp {
+		result[i] = item.value
 	}
 
 	return result
@@ -312,33 +306,36 @@ func (am argMap) flagValue(
 	defValue,
 	sepList string,
 ) ([]string, bool) {
-	var result []string
+	short, long := am[shortFlag], am[longFlag]
+	total := len(short) + len(long)
 
-	// Join all values from all types of flags (long/short).
-	tmp := []argValue{}
-	for _, key := range []string{shortFlag, longFlag} {
-		if items, ok := am[key]; ok {
-			tmp = append(tmp, items...)
-		}
-	}
-
-	// Return default value.
-	if len(tmp) == 0 {
+	switch total {
+	case 0:
+		// Return default value.
 		return []string{defValue}, false
+	case 1:
+		// Single value from one of the synonyms: no merge or sort needed
+		// (the common case for non-list fields).
+		if len(short) == 1 {
+			return []string{short[0].value}, true
+		}
+		return []string{long[0].value}, true
 	}
 
-	// Be sure to set the sequence of values that was in the command line.
-	// For example: -UOne --users=Two -U Three where U and users is synonyms,
-	// result should be ["One", "Two", "Three"], but now it will
-	// look like ["One", "Three", "Two"] because short flags
-	// are processed first.
+	// Merge values from both synonyms and restore the sequence that was on
+	// the command line. For example: -UOne --users=Two -U Three where U and
+	// users are synonyms, the result must be ["One", "Two", "Three"] and not
+	// ["One", "Three", "Two"] (short flags are stored first).
+	tmp := make([]argValue, 0, total)
+	tmp = append(tmp, short...)
+	tmp = append(tmp, long...)
 	sort.Slice(tmp, func(i, j int) bool {
 		return tmp[i].order < tmp[j].order
 	})
 
-	// Get the value of the arguments only.
-	for _, item := range tmp {
-		result = append(result, item.value)
+	result := make([]string, len(tmp))
+	for i, item := range tmp {
+		result[i] = item.value
 	}
 
 	return result, true

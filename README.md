@@ -9,14 +9,14 @@ Package opt implements methods for manage arguments of the command-line.
 To install this package we can use `go get`:
 
 ```
-$ go get -u github.com/goloop/opt
+$ go get -u github.com/goloop/opt/v2
 ```
 
 ## Usage
 
 To use this package import it as:
 
-    import "github.com/goloop/opt"
+    import "github.com/goloop/opt/v2"
 
 ## Quick start
 
@@ -43,7 +43,7 @@ import (
 	"net/url"
 	"os"
 
-	"github.com/goloop/opt"
+	"github.com/goloop/opt/v2"
 )
 
 // Args is command-line argument object.
