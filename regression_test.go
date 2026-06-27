@@ -106,7 +106,7 @@ func TestOptionSortShortOnly(t *testing.T) {
 		&fieldCast{tagGroup: &tagGroup{shortFlag: "m", helpMsg: "m help"}},
 	}
 
-	optText, _ := getOptionBlock(fcl, argMap{})
+	optText, _ := getOptionBlock(fcl)
 	ia := strings.Index(optText, "-a")
 	im := strings.Index(optText, "-m")
 	iz := strings.Index(optText, "-z")
@@ -393,7 +393,7 @@ func TestOptionSortMixed(t *testing.T) {
 		}},
 	}
 
-	optText, _ := getOptionBlock(fcl, argMap{})
+	optText, _ := getOptionBlock(fcl)
 	if strings.Index(optText, "zebra") > strings.Index(optText, "apple") {
 		t.Errorf("expected -a,--zebra before -b,--apple, got:\n%s", optText)
 	}

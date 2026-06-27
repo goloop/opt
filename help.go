@@ -6,8 +6,26 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"sync"
 	"unicode/utf8"
 )
+
+// helpCache memoizes the generated help text per struct type. The text is a
+// pure function of the struct definition (tags and field kinds), so it is the
+// same for every call on the same type.
+var helpCache sync.Map // map[reflect.Type]string
+
+// cachedHelp returns the help text for the struct type st, generating it from
+// fcl on first use and reusing it on subsequent calls.
+func cachedHelp(st reflect.Type, fcl fieldCastList) string {
+	if v, ok := helpCache.Load(st); ok {
+		return v.(string)
+	}
+
+	h := getHelp(fcl)
+	helpCache.Store(st, h)
+	return h
+}
 
 // The following concepts are used to generate text help
 // based on command line arguments:
@@ -114,7 +132,7 @@ func wrapHelpMsg(sep, str string, tab, wc int) []string {
 // there is no container `[]` for processing positional parameters,
 // 0 - if such a container exists and its size is not limited (for slice),
 // more than 0 if the number of elements in this container is limited (array).
-func getOptionBlock(fcl fieldCastList, am argMap) (string, int) {
+func getOptionBlock(fcl fieldCastList) (string, int) {
 	lines := []string{}
 
 	// Go through all the fields, make a prefix for the help line,
@@ -320,12 +338,14 @@ func getPositionalBlock(fcl fieldCastList, posArgsLen int) string {
 	return strings.Join(lines, "\n")
 }
 
-// The getHelp returns help on using command line options.
-func getHelp(fcl fieldCastList, am argMap) string {
+// The getHelp returns help on using command line options. The text depends
+// only on the struct definition (tags and field kinds), not on the parsed
+// values, so it can be cached per type by the caller.
+func getHelp(fcl fieldCastList) string {
 	var result []string
 
 	// Generate option block.
-	optText, posArgsLen := getOptionBlock(fcl, am)
+	optText, posArgsLen := getOptionBlock(fcl)
 	if optText != "" {
 		result = append(result, optText)
 	}

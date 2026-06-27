@@ -61,11 +61,10 @@ func unmarshalOpt(obj any, args []string) []error {
 	//  - need to collect all possible errors.
 	for _, fc := range fcl {
 		if fc.tagGroup.shortFlag == "?" {
-			// Generate help info.
-			// The field must be of the string type, see in
-			// the getFieldCastList function.
-			help := getHelp(fcl, am)
-			fc.item.Set(reflect.ValueOf(help))
+			// Store generated help info. The text depends only on the
+			// struct type, so it is generated once per type and cached.
+			// The field is a string (verified by getFieldCastList).
+			fc.item.SetString(cachedHelp(reflect.TypeOf(obj).Elem(), fcl))
 			continue
 		}
 

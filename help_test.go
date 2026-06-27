@@ -81,7 +81,6 @@ func TestGetOptionBlock(t *testing.T) {
 		array = reflect.ValueOf([8]string{})
 		tests = []struct {
 			fcl        fieldCastList
-			am         argMap
 			subOptText string
 			posArgsLen int
 		}{
@@ -115,9 +114,6 @@ func TestGetOptionBlock(t *testing.T) {
 						item: nil,
 					},
 				},
-				am: argMap(map[string][]argValue{
-					"port": {argValue{0, "8080"}},
-				}),
 				subOptText: "port of serve.",
 				posArgsLen: -1,
 			},
@@ -160,9 +156,6 @@ func TestGetOptionBlock(t *testing.T) {
 						item: nil,
 					},
 				},
-				am: argMap(map[string][]argValue{
-					"host": {argValue{0, "localhost"}},
-				}),
 				subOptText: "-h, --host" + separator + "network host is",
 				posArgsLen: -1,
 			},
@@ -170,7 +163,7 @@ func TestGetOptionBlock(t *testing.T) {
 	)
 
 	for i, test := range tests {
-		optText, posArgsLen := getOptionBlock(test.fcl, test.am)
+		optText, posArgsLen := getOptionBlock(test.fcl)
 		if strings.Index(optText, test.subOptText) < 0 {
 			t.Errorf(
 				"%d test, expected substring %s but it is not "+
