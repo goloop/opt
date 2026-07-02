@@ -9,7 +9,7 @@ import (
 	"sync"
 	"unicode/utf8"
 
-	"github.com/goloop/scs"
+	"github.com/goloop/scs/v2"
 )
 
 const (
@@ -341,9 +341,7 @@ func getTagGroup(
 		// Convert pascal case to kebab case for long flag name only.
 		optTagValue = fieldName
 		if utf8.RuneCountInString(fieldName) > 1 {
-			if kebab, err := scs.PascalToKebab(fieldName); err == nil {
-				optTagValue = kebab
-			}
+			optTagValue = scs.ToKebab(fieldName)
 		}
 	}
 
