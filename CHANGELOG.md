@@ -4,6 +4,45 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.3.0]
+
+Correctness fixes across the reflection and parsing layers. A few behaviour
+changes are noted below.
+
+### Added
+- Duplicate option names across fields are now detected and reported as a
+  struct-configuration panic instead of silently sharing one value.
+
+### Fixed
+- An unexported struct field no longer becomes a flag or makes every parse fail;
+  it is skipped, as `encoding/json` does.
+- A nil pointer field (e.g. `Port *int`) is auto-allocated when a value is
+  provided and left nil when the option is absent, instead of failing on every
+  call with a leaked reflect error.
+- A parsed list now replaces the field's contents instead of appending to it, so
+  a pre-populated slice or a second `Unmarshal` no longer accumulates values.
+- `Inf` / `-Inf` is accepted for a `float32` field (it is representable) rather
+  than reported as an overflow.
+- An array overflow records its error and keeps going, so the remaining fields
+  and errors are still reported via `errors.Join`.
+- A real empty positional argument (`app ""`) is kept, consistently with a
+  non-empty one.
+- The `-?` doc key and positional order keys are no longer accepted as
+  command-line flags.
+- The help text reports the true positional-array capacity (no off-by-one) and
+  uses correct grammar ("takes one positional argument" / "takes up to N
+  positional arguments").
+
+### Changed
+- **Behaviour:** a non-boolean option given without a value (e.g. `--host`
+  followed by another flag) is now a usage error instead of being silently set
+  to `"true"`.
+- **Behaviour:** a lone `-` is treated as a positional operand (POSIX), not an
+  invalid option.
+- **Behaviour:** `Unmarshal`/`UnmarshalArgs` returns an error for a nil or
+  non-pointer `obj` instead of panicking; a panic is now reserved for struct-tag
+  misconfiguration.
+
 ## [2.1.0] - 2026-06-27
 
 ### Performance

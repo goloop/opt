@@ -6,24 +6,22 @@ import (
 )
 
 // Unmarshal parses the argument-line options and stores the result
-// to go-struct. If the obj isn't a pointer to struct or is nil -
-// returns an error.
+// to go-struct. If obj is nil or is not a pointer to a non-empty struct,
+// it returns an error (it does not panic).
 //
 // Unmarshal method supports the following field's types: int, int8, int16,
 // int32, int64, uint, uint8, uint16, uint32, uint64, float32, float64, string,
 // bool, url.URL and pointers, array or slice from those types (i.e. *int, ...,
 // []int, ..., []bool, ..., [2]*url.URL, etc.).
 //
-// For other field's types (like chan, map ...) will be returned an error.
+// The function generates a panic only for a struct-tag misconfiguration - a
+// developer error visible on the first run:
 //
-// The function generates a panic if:
-//
-// - the object isn't a structure;
-// - the object isn't transmitted by pointer;
 // - a non-string type field is specified for the `opt:"?"` doc-field;
 // - field for positional arguments `opt:"[]"` is not a list (slice/array);
 // - field has structure type (except url.URL);
-// - field has pointer to structure type (except *url.URL).
+// - field has pointer to structure type (except *url.URL);
+// - two fields declare the same option name.
 //
 // Use the following tags in the fields of structure to
 // set the marshalling parameters:

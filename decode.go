@@ -33,16 +33,22 @@ var durationType = reflect.TypeOf(time.Duration(0))
 func unmarshalOpt(obj any, args []string) []error {
 	var errs []error
 
+	// A wrong obj - nil, not a pointer, or not a pointer to a non-empty struct -
+	// is a runtime caller error (obj may arrive from a variable), so return it
+	// instead of panicking, as documented and as encoding/json does. A bad
+	// struct TAG remains a panic below: that is a developer error, visible on
+	// the first run.
+	if _, _, err := validateStruct(obj); err != nil {
+		return []error{err}
+	}
+
 	// Analyze the structure and return a list of molds
 	// of each field: field name, tag group and field pointer.
 	//
-	// If it's returns an error - be critical!
-	// This is a problem with an incorrect structure and we need to
-	// stop the program until the developer fixes this error.
+	// A remaining error here is a tag/type misconfiguration of the struct, so
+	// be critical and stop the program until the developer fixes it.
 	fcl, err := getFieldCastList(obj)
 	if err != nil {
-		// Convert this error to panic because it's a problem of
-		// structure's fields (it's developer's problem).
 		panic(err)
 	}
 
@@ -109,7 +115,11 @@ func unmarshalOpt(obj any, args []string) []error {
 		// []string{defValue} where defValue can be like "" - this is not
 		// valid for a list because if the command line argument has no
 		// data for the list this list must be empty!
-		isEmptyList := !ok && len(value) == 1 && value[0] == ""
+		//
+		// This heuristic applies only to flag-valued lists: a positional list
+		// is fed by posValues(), where ok is always false and a real empty
+		// positional argument ("") must be kept, not discarded.
+		isEmptyList := !ok && !isPositional && len(value) == 1 && value[0] == ""
 
 		// Set values of the desired type.
 		switch kind {
@@ -121,12 +131,15 @@ func unmarshalOpt(obj any, args []string) []error {
 			// If a separator is specified, the elements must be separated.
 			result := splitValues(value, fc.tagGroup.sepList)
 			if max := fc.item.Type().Len(); len(result) > max {
-				// Array overflow.
-				return []error{fmt.Errorf(
+				// Array overflow: record the error and keep going so the
+				// remaining fields (and any collected errors) are still
+				// reported via errors.Join, as the package contract promises.
+				errs = append(errs, fmt.Errorf(
 					"maximum number of values for %s argument "+
 						"is %d but passed %d values",
 					arg, max, len(result),
-				)}
+				))
+				continue
 			}
 
 			err = setSequence(fc.item, result)
@@ -142,14 +155,26 @@ func unmarshalOpt(obj any, args []string) []error {
 				tmp := reflect.MakeSlice(fc.item.Type(), size, size)
 				err = setSequence(&tmp, result)
 				if err == nil {
-					fc.item.Set(reflect.AppendSlice(*fc.item, tmp))
+					// Replace the slice contents, like encoding/json, so a
+					// pre-populated field or a second Unmarshal does not
+					// accumulate values.
+					fc.item.Set(tmp)
 				}
 			}
 		case reflect.Ptr:
 			if fc.item.Type().Elem().Kind() != reflect.Struct {
-				// If the pointer is not to a structure.
-				tmp := reflect.Indirect(*fc.item)
-				err = setValue(tmp, value[len(value)-1])
+				// A pointer to a scalar (e.g. *int). Leave a truly absent
+				// optional pointer nil; otherwise allocate it so its element
+				// can be set instead of dereferencing a nil pointer (which
+				// previously failed on every call with a leaked reflect error).
+				last := value[len(value)-1]
+				if !ok && last == "" {
+					break
+				}
+				if fc.item.IsNil() {
+					fc.item.Set(reflect.New(fc.item.Type().Elem()))
+				}
+				err = setValue(reflect.Indirect(*fc.item), last)
 			} else {
 				// If a pointer to a structure of the url.URL.
 				err = setValue(*fc.item, value[len(value)-1])
@@ -425,7 +450,9 @@ func strToFloatKind(value string, kind reflect.Kind) (r float64, err error) {
 
 	switch kind {
 	case reflect.Float32:
-		if math.Abs(r) > math.MaxFloat32 {
+		// ±Inf is representable in float32, so it is not an overflow; only a
+		// finite magnitude beyond MaxFloat32 is.
+		if !math.IsInf(r, 0) && math.Abs(r) > math.MaxFloat32 {
 			return 0.0, fmt.Errorf("%f overflows float32", r)
 		}
 	case reflect.Float64:

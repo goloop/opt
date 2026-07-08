@@ -186,7 +186,7 @@ func TestPositionalHelpNumericSort(t *testing.T) {
 	}
 
 	posText := getPositionalBlock(fcl, 0)
-	if !strings.Contains(posText, "takes 10") {
+	if !strings.Contains(posText, "takes up to 10") {
 		t.Errorf("expected count 10, got:\n%s", posText)
 	}
 

@@ -119,8 +119,12 @@ func (fcl fieldCastList) flags() map[string]int {
 	result := make(map[string]int, len(fcl))
 
 	for _, fc := range fcl {
-		if fc.tagGroup.shortFlag != "" {
-			result[fc.tagGroup.shortFlag]++
+		// Service keys are not command-line flags: "?" is the doc field, "[]"
+		// is the positional list, and an order key ("0".."N") is a positional
+		// slot. Adding them here would let "-?" or "--1 x" be accepted as real
+		// flags and corrupt positional numbering.
+		if sf := fc.tagGroup.shortFlag; sf != "" && !isServiceKey(sf) {
+			result[sf]++
 		}
 
 		if fc.tagGroup.longFlag != "" {
@@ -129,6 +133,13 @@ func (fcl fieldCastList) flags() map[string]int {
 	}
 
 	return result
+}
+
+// isServiceKey reports whether s is an internal opt key rather than a real
+// command-line flag: the doc marker "?", the positional-list marker "[]" or a
+// positional order key ("0", "1", ...).
+func isServiceKey(s string) bool {
+	return s == "?" || s == "[]" || isOrderFlag(s)
 }
 
 // The boolFlags returns the set of flag names (short and long) whose field is
@@ -194,9 +205,21 @@ var specCache sync.Map // map[reflect.Type][]fieldSpec
 func buildFieldSpecs(st reflect.Type) ([]fieldSpec, error) {
 	var result []fieldSpec
 
+	// seen maps an already-used flag name to the field that claimed it, so a
+	// duplicate short/long flag is reported as a struct misconfiguration
+	// instead of two fields silently sharing one value.
+	seen := make(map[string]string)
+
 	urlS, urlP := reflect.TypeOf(url.URL{}), reflect.TypeOf((*url.URL)(nil))
 	for i := 0; i < st.NumField(); i++ {
 		field := st.Field(i)
+
+		// Skip unexported fields entirely, tagged or not, as encoding/json
+		// does: reflect cannot set them, and treating one as a flag makes every
+		// parse fail with a leaked reflect error.
+		if !field.IsExported() {
+			continue
+		}
 
 		// Get tag group.
 		//
@@ -241,6 +264,21 @@ func buildFieldSpecs(st reflect.Type) ([]fieldSpec, error) {
 
 		if err != nil {
 			return nil, err
+		}
+
+		// Reject duplicate flag names (short or long) across fields. Service
+		// keys ("?", "[]", order keys) are not real flags and are left to their
+		// own type checks above.
+		for _, name := range []string{tg.shortFlag, tg.longFlag} {
+			if name == "" || isServiceKey(name) {
+				continue
+			}
+			if prev, dup := seen[name]; dup {
+				return nil, fmt.Errorf(
+					"duplicate option name %q on fields %s and %s",
+					name, prev, field.Name)
+			}
+			seen[name] = field.Name
 		}
 
 		result = append(result, fieldSpec{

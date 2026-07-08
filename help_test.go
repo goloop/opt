@@ -126,7 +126,7 @@ func TestGetOptionBlock(t *testing.T) {
 						item: &array,
 					},
 				},
-				posArgsLen: 7, // 0 element it's an app ptah
+				posArgsLen: 8, // the array's full length is its capacity
 			},
 			{
 				fcl: fieldCastList{

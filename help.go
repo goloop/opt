@@ -150,10 +150,10 @@ func getOptionBlock(fcl fieldCastList) (string, int) {
 			// limited by its size. For slice are no restrictions.
 			switch fc.item.Kind() {
 			case reflect.Array:
+				// The array holds only positional arguments; argv[0] (the app
+				// path) is excluded by the decoder's posValues(), so the full
+				// array length is the capacity - do not subtract one.
 				posArgsLen = fc.item.Len()
-				if posArgsLen > 0 {
-					posArgsLen-- // 0 element it's an app ptah
-				}
 				posArgsExists = posArgsLen != 0
 			case reflect.Slice:
 				posArgsLen = 0
@@ -315,9 +315,9 @@ func getPositionalBlock(fcl fieldCastList, posArgsLen int) string {
 	case posArgsLen == 0:
 		subtitle = "The app takes an unlimited number of positional arguments"
 	case posArgsLen == 1:
-		subtitle = "The app takes an one of positional argument"
+		subtitle = "The app takes one positional argument"
 	default:
-		tpl := "The app takes %d of the positional arguments"
+		tpl := "The app takes up to %d positional arguments"
 		subtitle = fmt.Sprintf(tpl, posArgsLen)
 	}
 

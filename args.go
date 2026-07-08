@@ -7,10 +7,6 @@ import (
 	"strings"
 )
 
-// The flagMap a special type that stores the names of flags and
-// their number declared in the data structure.
-type flagMap map[string]int
-
 // The argValue is a special type to save the value of the argument.
 type argValue struct {
 	order int    // order of the argument on the command line
@@ -148,23 +144,34 @@ func (am argMap) parse(
 			}
 
 			key, value := flag, "true"
+			assigned := false
 			if data != "" {
 				value = string(data)
+				assigned = true
 			} else if hasEq {
 				// Explicit empty value: "--flag=" means an empty/zero
 				// value, not a "true" switch and not the next token.
 				value = ""
+				assigned = true
 			} else if i+1 < len(args) && takeNextValue(
 				args[i+1], boolFlags[key],
 			) {
 				// Take the value from the next item.
 				value = args[i+1]
+				assigned = true
 				i++ // be sure to move to the right by one position
 			}
 
+			// A non-boolean option with no value is a usage error, not an
+			// implicit "true" (which would silently corrupt a string field or
+			// fail a numeric one with a confusing message).
+			if !assigned && !boolFlags[key] {
+				return fmt.Errorf("option %s requires a value", item)
+			}
+
 			am[key] = append(am[key], argValue{i, value})
-		case strings.HasPrefix(item, "-") && !looksLikeNumber(item) &&
-			!posState.active:
+		case item != "-" && strings.HasPrefix(item, "-") &&
+			!looksLikeNumber(item) && !posState.active:
 			// Short flag. The short flags can be grouped. The value can be
 			// concatenated to the flag or as a series of subsequent entries
 			// in the list.
@@ -205,6 +212,7 @@ func (am argMap) parse(
 
 			for j, flag := range group {
 				key, value := string(flag), "true"
+				assigned := false
 
 				if j == len(group)-1 {
 					// For last flag in flag list only.
@@ -213,13 +221,21 @@ func (am argMap) parse(
 						// symmetrically with the long form "--port=80".
 						value = strings.TrimLeft(string(data), " ")
 						value = strings.TrimPrefix(value, "=")
+						assigned = true
 					} else if i+1 < len(args) && takeNextValue(
 						args[i+1], boolFlags[key],
 					) {
 						// Take the value from the next item.
 						value = args[i+1]
+						assigned = true
 						i++ // be sure to move to the right by one position
 					}
+				}
+
+				// A non-boolean option with no value is a usage error, not an
+				// implicit "true".
+				if !assigned && !boolFlags[key] {
+					return fmt.Errorf("option -%s requires a value", key)
 				}
 
 				am[key] = append(am[key], argValue{i, value})

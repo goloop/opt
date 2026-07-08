@@ -225,43 +225,29 @@ func TestUnmarshalOptLongName(t *testing.T) {
 
 // TestUnmarshalOptNotPointer tests unmarshalOpt with a non-pointer object.
 func TestUnmarshalOptNotPointer(t *testing.T) {
-	// Note: An incorrect storage object causes the function to cause panic!
-	defer func() {
-		if err := recover(); err == nil {
-			t.Error("an error is expected for non-pointer object")
-		}
-	}()
-
+	// A wrong obj is a runtime caller error and is now returned, not panicked.
 	type data struct{}
-	unmarshalOpt(data{}, []string{"/app", "5", "10"}) // panic is expected
+	if errs := unmarshalOpt(data{}, []string{"/app", "5", "10"}); len(errs) == 0 {
+		t.Error("an error is expected for non-pointer object")
+	}
 }
 
 // TestUnmarshalOptNotInitialized tests unmarshalOpt
 // with a not initialized object.
 func TestUnmarshalOptNotInitialized(t *testing.T) {
-	// Note: An incorrect storage object causes the function to cause panic!
-	defer func() {
-		if err := recover(); err == nil {
-			t.Error("an error is expected for not initialized object")
-		}
-	}()
-
 	var d *struct{}
-	unmarshalOpt(d, []string{"/app", "5", "10", "15"}) // panic is expected
+	if errs := unmarshalOpt(d, []string{"/app", "5", "10", "15"}); len(errs) == 0 {
+		t.Error("an error is expected for not initialized object")
+	}
 }
 
 // TestUnmarshalOptNotStruct tests unmarshalOpt
 // with a object that isn't a struct.
 func TestUnmarshalOptNotStruct(t *testing.T) {
-	// Note: An incorrect storage object causes the function to cause panic!
-	defer func() {
-		if err := recover(); err == nil {
-			t.Error("an error is expected for a non-struct pointer")
-		}
-	}()
-
 	d := new(int)
-	unmarshalOpt(d, []string{"/app", "5", "10"}) // panic is expected
+	if errs := unmarshalOpt(d, []string{"/app", "5", "10"}); len(errs) == 0 {
+		t.Error("an error is expected for a non-struct pointer")
+	}
 }
 
 // TestOverflow tests with struct.
@@ -406,11 +392,14 @@ func TestPtr(t *testing.T) {
 		t.Error(err)
 	}
 
-	// Not initialized pointer.
+	// A nil pointer field is now auto-allocated when a value is provided.
 	obj = data{}
 	test = split("./app:--age:99")
-	if err := unmarshalOpt(&obj, test); err == nil {
-		t.Error("expected error")
+	if err := unmarshalOpt(&obj, test); err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	if obj.Age == nil || *obj.Age != 99 {
+		t.Errorf("Age = %v, want 99", obj.Age)
 	}
 }
 

@@ -10,6 +10,7 @@ import (
 func TestParse(t *testing.T) {
 	split := func(str string) []string { return strings.Split(str, ":") }
 	flags := map[string]int{"d": 1, "U": 1, "g": 1, "verbose": 1}
+	boolFlags := map[string]bool{"d": true} // -d is a boolean switch
 	expected := map[string][]string{
 		"0": {"./app"}, "1": {"5"}, "2": {"10"}, "3": {"15"},
 		"U": {"Jan,Bob"}, "d": {"true"}, "g": {"Hello, world"},
@@ -21,13 +22,13 @@ func TestParse(t *testing.T) {
 		split("./app:-dU:Jan,Bob:--verbose:false:-g:Hello, world:5:10:15"),
 		split("./app:-dUJan,Bob:--verbose=false:-gHello, world:5:10:15"),
 		split("./app:5:10:15:-dUJan,Bob:--verbose:false:-gHello, world"),
-		split("./app:5:10:15:-UJan,Bob:--verbose:false:-gHello, world:-d:true"),
+		split("./app:5:10:15:-UJan,Bob:--verbose:false:-gHello, world:-d"),
 		split("./app:5:-UJan,Bob:--verbose:false:-gHello, world:-d:--:10:15"),
 	}
 
 	am := argMap{}
 	for _, test := range tests {
-		if err := am.parse(test, flags, nil); err != nil {
+		if err := am.parse(test, flags, boolFlags); err != nil {
 			t.Error(err)
 		}
 
@@ -84,6 +85,7 @@ func TestParseErrors(t *testing.T) {
 func TestPositional(t *testing.T) {
 	split := func(str string) []string { return strings.Split(str, ":") }
 	flags := map[string]int{"d": 1, "U": 1, "g": 1, "verbose": 1}
+	boolFlags := map[string]bool{"d": true} // -d is a boolean switch
 	expected := []string{"5", "10", "15"} // ignore app name "./app"
 	tests := [][]string{
 		split("./app:-dU:Jan,Bob:--no-verbose:-g:Hello, world:5:10:15"),
@@ -91,13 +93,13 @@ func TestPositional(t *testing.T) {
 		split("./app:-dU:Jan,Bob:--verbose:false:-g:Hello, world:5:10:15"),
 		split("./app:-dUJan,Bob:--verbose=false:-gHello, world:5:10:15"),
 		split("./app:5:10:15:-dUJan,Bob:--verbose:false:-gHello, world"),
-		split("./app:5:10:15:-UJan,Bob:--no-verbose:-gHello, world:-d:true"),
+		split("./app:5:10:15:-UJan,Bob:--no-verbose:-gHello, world:-d"),
 		split("./app:5:-UJan,Bob:--verbose:false:-gHello, world:-d:--:10:15"),
 	}
 
 	for i, test := range tests {
 		am := argMap{}
-		if err := am.parse(test, flags, nil); err != nil {
+		if err := am.parse(test, flags, boolFlags); err != nil {
 			t.Error(err)
 		}
 
@@ -118,6 +120,7 @@ func TestPositional(t *testing.T) {
 func TestValue(t *testing.T) {
 	split := func(str string) []string { return strings.Split(str, ":") }
 	flags := map[string]int{"d": 1, "U": 1, "g": 1, "verbose": 1, "users": 1}
+	boolFlags := map[string]bool{"d": true} // -d is a boolean switch
 	expected := []string{"Jan,Bob"}
 	tests := [][]string{
 		// Short flag for users.
@@ -130,13 +133,13 @@ func TestValue(t *testing.T) {
 		split("./app:5:10:15:--users:Jan,Bob:--verbose:false:-gHello, world"),
 
 		// Default value.
-		split("./app:5:10:15:--verbose:false:-gHello, world:-d:true"),
+		split("./app:5:10:15:--verbose:false:-gHello, world:-d"),
 		split("./app:5:--verbose:false:-gHello, world:-d:--:10:15"),
 	}
 
 	am := argMap{}
 	for _, test := range tests {
-		if err := am.parse(test, flags, nil); err != nil {
+		if err := am.parse(test, flags, boolFlags); err != nil {
 			t.Error(err)
 		}
 
