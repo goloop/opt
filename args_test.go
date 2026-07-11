@@ -86,7 +86,7 @@ func TestPositional(t *testing.T) {
 	split := func(str string) []string { return strings.Split(str, ":") }
 	flags := map[string]int{"d": 1, "U": 1, "g": 1, "verbose": 1}
 	boolFlags := map[string]bool{"d": true} // -d is a boolean switch
-	expected := []string{"5", "10", "15"} // ignore app name "./app"
+	expected := []string{"5", "10", "15"}   // ignore app name "./app"
 	tests := [][]string{
 		split("./app:-dU:Jan,Bob:--no-verbose:-g:Hello, world:5:10:15"),
 		split("./app:-d:-U:Jan,Bob:--no-verbose:-g:Hello, world:--:5:10:15"),

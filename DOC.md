@@ -41,6 +41,12 @@ The parser follows POSIX/getopt conventions: short flags can be grouped
 trailing positional arguments from flags, and booleans are switches that never
 consume the next token.
 
+Because absent flags leave fields untouched (like fields missing from a JSON
+document), the usual configuration layering falls out naturally: fill the
+struct with defaults, overlay the environment, then call `Unmarshal` - each
+stage only overrides what it actually names, and a `def` tag never beats a
+value an earlier stage already set.
+
 ```go
 import "github.com/goloop/opt/v2"
 ```
@@ -72,7 +78,7 @@ the error text). It can also panic on a *programming* mistake — see
 |-----|---------|---------|
 | `opt`  | short or long flag name; may carry comma-separated modifiers, e.g. `opt:"host,required"` | field name in kebab-case |
 | `alt`  | the alternative name (short if `opt` is long, or vice versa) | none |
-| `def`  | default value when the flag is absent | zero value |
+| `def`  | default applied when the flag is absent **and** the field still holds its zero value | field left untouched |
 | `sep`  | delimiter that splits a list value | empty (one flag per item) |
 | `help` | short description shown in generated help | none (hidden) |
 

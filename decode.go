@@ -111,6 +111,18 @@ func unmarshalOpt(obj any, args []string) []error {
 			}
 		}
 
+		// An absent flag never clobbers a value the caller pre-filled,
+		// mirroring how encoding/json leaves fields missing from the input
+		// untouched. Without a def tag the field is skipped entirely; a def
+		// applies only while the field still holds its zero value. This is
+		// what makes the usual layering work: defaults, then environment,
+		// then flags - each stage only overrides what it actually names.
+		if !ok && !isPositional {
+			if fc.tagGroup.defValue == "" || !fc.item.IsZero() {
+				continue
+			}
+		}
+
 		// If the argMap.flagValue hasn't value it's returns
 		// []string{defValue} where defValue can be like "" - this is not
 		// valid for a list because if the command line argument has no

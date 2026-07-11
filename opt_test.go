@@ -92,7 +92,6 @@ func TestLongFlags(t *testing.T) {
 
 // TestShortFlags tests Unmarshal with short flags.
 func TestShortFlags(t *testing.T) {
-	args := testArgs{}
 	split := func(str string) []string { return strings.Split(str, ":") }
 	tests := []struct {
 		Args     []string
@@ -111,6 +110,9 @@ func TestShortFlags(t *testing.T) {
 	}
 
 	for _, test := range tests {
+		// A fresh struct per case: an absent flag preserves whatever the
+		// caller pre-filled, so reusing one struct would carry values over.
+		args := testArgs{}
 		if err := UnmarshalArgs(&args, test.Args); err != nil {
 			t.Error(err)
 		}

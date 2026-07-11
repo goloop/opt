@@ -4,6 +4,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.4.0] - 2026-07-11
+
+### Changed
+- An absent flag no longer clobbers a pre-filled field, mirroring how
+  encoding/json leaves fields missing from the input untouched; a `def`
+  tag applies only while the field still holds its zero value. This makes
+  the usual layering work: defaults, then environment, then flags.
+
 ## [2.3.0]
 
 Correctness fixes across the reflection and parsing layers. A few behaviour
