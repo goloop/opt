@@ -85,7 +85,7 @@ func (am argMap) parse(
 		item := args[i]
 
 		switch {
-		case item == "--":
+		case item == "--" && !posState.active:
 			// Toggles the parser to read positional arguments.
 			//
 			// Example:
@@ -106,31 +106,15 @@ func (am argMap) parse(
 			//   ./app --user Goloop
 			//
 			// where --user == "Goloop" and --verbose == false.
-			var flag, data string
-			var hasEq bool
+			flag, data, hasEq := strings.Cut(strings.TrimPrefix(item, "--"), "=")
+			flag = strings.ToLower(flag)
 
-			// Separate the flags from the value, like:
-			// Example: --user=Goloop or --user Goloop where is user is a flag
-			// and Goloop is a value. Or --no-verbose where verbose is a flag
-			// and no- is boolean "no".
-
-			// Split data and flag name.
-			// Write the name of the long flag in lower case,
-			// but we don't change the case for value.
-			flag = strings.TrimPrefix(item, "--")
-			if tmp := strings.SplitN(flag, "=", 2); len(tmp) == 2 {
-				flag, data, hasEq = strings.ToLower(tmp[0]), tmp[1], true
-			} else {
-				flag = strings.ToLower(flag)
-			}
-
-			// Detect reverse mode and flag availability.
 			switch _, ok := flags[flag]; {
 			case !ok && strings.HasPrefix(flag, "no-"):
 				// The flag is not available, but there is
 				// a possibility that it needs reverse mode.
 				fwn := strings.TrimPrefix(flag, "no-")
-				if _, ok := flags[fwn]; ok {
+				if boolFlags[fwn] {
 					// The flag needs reverse mode but cannot be
 					// reverse mode at the same time as data exists.
 					if data == "" {

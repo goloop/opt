@@ -115,3 +115,7 @@ Contributions are welcome. Please run `go test ./...`, `go vet ./...` and
 ## License
 
 `opt` is released under the MIT License. See [LICENSE](LICENSE).
+
+## Release v2.4.1
+
+Preserve literal separators and reject negated non-boolean options.

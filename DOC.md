@@ -255,3 +255,7 @@ repeat the flag (`-c a -c b`) or pass one delimited value (`-c a,b`).
 **Trailing positionals after a switch.** End the command line with `--` before
 positional values when the last flag is a boolean, so they aren't swallowed as
 its value.
+
+## Release v2.4.1
+
+Preserve literal separators and reject negated non-boolean options.
