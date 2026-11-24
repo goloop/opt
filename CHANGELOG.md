@@ -4,6 +4,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Fixed
+- Attached values of short options are no longer read as flags when they begin
+  with a registered flag name. For boolean `-v` and `-d` and value-taking `-p`,
+  `-vpd` now sets `-p` to `d`, as documented.
+
 ## [2.4.1] - 2026-10-18
 
 Preserve literal separators and reject negated non-boolean options.
