@@ -168,16 +168,9 @@ func (am argMap) parse(
 			// where -d == true, -U == "Goloop" and -g == "Hello, world"
 			var group, data []rune
 
-			// Separate the flags from the value, like:
-			// Example: -dUGoloop or -dU Goloop where is dU is the group of
-			// flags and Goloop is value for -U, it is possible when d and U
-			// in shortFlags and G isn't.
-			//
-			// In one group, a repeating flag is considered the result
-			// of the previous flag. For example: -dUd, this is an alternative
-			// to -dU d or -d -U d where last d is value for -U. Therefore, it
-			// is necessary to monitor the uniqueness of the flag in the group
-			// during parsing.
+			// Separate boolean flags from a value-taking flag and its value.
+			// In -dUGoloop, -d is a switch and -U receives "Goloop", even
+			// when characters in the value are also registered short flags.
 			unique := make(map[rune]bool)
 			group = []rune(strings.TrimPrefix(item, "-"))
 			for i, c := range group {
@@ -187,6 +180,10 @@ func (am argMap) parse(
 					break
 				}
 				unique[c] = true
+				if !boolFlags[string(c)] {
+					group, data = group[:i+1], group[i+1:]
+					break
+				}
 			}
 
 			// If no flag is set, this is a command line error.
